@@ -65,13 +65,13 @@ main() {
     echo -e "New version: ${GREEN}v$new_version${NC}"
     echo
     
-    # Create version file
-    echo "$new_version" > version
-    
     # Update version in yads script (if it has a hardcoded version)
     if grep -q "echo \"1.0.0\"" yads; then
         sed -i "s/echo \"1.0.0\"/echo \"$new_version\"/" yads
     fi
+    
+    # Create version file for fallback (Git tags are primary)
+    echo "$new_version" > version
     
     # Add files to git
     git add version yads

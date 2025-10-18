@@ -825,8 +825,18 @@ upgrade_yads() {
 
 # Get YADS version
 get_version() {
-    # Try to get version from git describe first
+    # Try to get version from git describe first (prefer tags)
     if command -v git &> /dev/null && [[ -d ".git" ]]; then
+        # Get the latest tag
+        local latest_tag=$(git describe --tags --abbrev=0 2>/dev/null)
+        if [[ -n "$latest_tag" ]]; then
+            # Remove 'v' prefix if present
+            local version=${latest_tag#v}
+            echo "$version"
+            return
+        fi
+        
+        # If no tags, try git describe with commit hash
         local git_version=$(git describe --tags --always 2>/dev/null)
         if [[ -n "$git_version" ]]; then
             echo "$git_version"
@@ -849,6 +859,8 @@ show_version() {
     local version=$(get_version)
     local git_commit=$(git rev-parse --short HEAD 2>/dev/null || echo 'Unknown')
     local git_date=$(git log -1 --format=%cd --date=short 2>/dev/null || echo 'Unknown')
+    local latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo 'No tags')
+    local tag_count=$(git tag | wc -l 2>/dev/null || echo '0')
     
     log "${CYAN}YADS - Yet Another Development Server${NC}"
     echo
@@ -862,6 +874,8 @@ show_version() {
     echo "  • projects.sh - Project creation and management"
     echo
     echo -e "${GREEN}Git Information:${NC}"
+    echo "  • Latest Tag: $latest_tag"
+    echo "  • Total Tags: $tag_count"
     echo "  • Commit: $git_commit"
     echo "  • Date: $git_date"
     echo "  • Branch: $(git branch --show-current 2>/dev/null || echo 'Unknown')"
