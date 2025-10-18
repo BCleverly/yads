@@ -54,25 +54,38 @@ detect_and_remove() {
             ;;
         "apache2")
             if command -v apache2 &> /dev/null || command -v httpd &> /dev/null; then
-                warning "Apache2/HTTPD is already installed. This will conflict with NGINX/FrankenPHP."
                 echo
-                log "${YELLOW}⚠ CONFLICT DETECTED ⚠${NC}"
+                echo "=================================================="
+                log "${RED}🚨 CRITICAL WARNING: APACHE2 CONFLICT DETECTED 🚨${NC}"
+                echo "=================================================="
                 echo
-                log "${RED}YADS requires NGINX or FrankenPHP as web server, but Apache2/HTTPD is already installed.${NC}"
+                warning "Apache2/HTTPD is already installed and will CONFLICT with YADS."
                 echo
-                log "${YELLOW}What will happen if you continue:${NC}"
-                echo "  • Apache2/HTTPD will be COMPLETELY REMOVED"
-                echo "  • All Apache2/HTTPD services will be stopped"
-                echo "  • All Apache2/HTTPD configuration files will be deleted"
-                echo "  • YADS will install NGINX or FrankenPHP instead"
+                log "${RED}⚠️  DESTRUCTIVE ACTION REQUIRED ⚠️${NC}"
+                echo
+                log "${YELLOW}YADS requires NGINX or FrankenPHP as web server.${NC}"
+                log "${YELLOW}Apache2/HTTPD cannot coexist with YADS web servers.${NC}"
+                echo
+                log "${RED}🔥 WHAT WILL BE DELETED IF YOU CONTINUE:${NC}"
+                echo "  🗑️  Apache2/HTTPD will be COMPLETELY REMOVED"
+                echo "  🛑 All Apache2/HTTPD services will be STOPPED"
+                echo "  📁 All Apache2/HTTPD configuration files will be DELETED"
+                echo "  🗂️  All Apache2/HTTPD log files will be REMOVED"
+                echo "  ⚙️  All Apache2/HTTPD modules will be UNINSTALLED"
+                echo "  🔄 YADS will install NGINX or FrankenPHP instead"
+                echo
+                log "${YELLOW}⚠️  THIS ACTION CANNOT BE UNDONE! ⚠️${NC}"
                 echo
                 log "${GREEN}Your options:${NC}"
-                echo "  [y] YES - Remove Apache2/HTTPD and continue with YADS installation"
+                echo "  [y] YES - DELETE Apache2/HTTPD and continue with YADS installation"
                 echo "  [n] NO  - Cancel installation and keep Apache2/HTTPD"
                 echo
-                read -p "${RED}Do you want to REMOVE Apache2/HTTPD and continue? [y/N]: ${NC}" REMOVE_APACHE
+                log "${RED}⚠️  WARNING: Continuing will PERMANENTLY DELETE Apache2/HTTPD! ⚠️${NC}"
+                echo
+                read -p "${RED}🔥 Do you want to DELETE Apache2/HTTPD and continue? [y/N]: ${NC}" REMOVE_APACHE
                 if [[ "$REMOVE_APACHE" =~ ^[yY]$ ]]; then
-                    info "Removing Apache2/HTTPD..."
+                    echo
+                    log "${RED}🔥 Proceeding to DELETE Apache2/HTTPD...${NC}"
                     remove_apache2
                 else
                     error_exit "Installation cancelled. Apache2/HTTPD will not be removed."
