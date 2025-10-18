@@ -392,6 +392,7 @@ show_code_server_instructions() {
     echo "  • https://vscode.${DOMAIN:-yourdomain.com}"
     echo "  • https://code.${DOMAIN:-yourdomain.com}"
     echo "  • https://editor.${DOMAIN:-yourdomain.com}"
+    echo "  • https://developer.${DOMAIN:-yourdomain.com}"
     echo
     log "${GREEN}Service Management:${NC}"
     echo "  • Start: sudo systemctl start code-server"

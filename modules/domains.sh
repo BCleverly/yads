@@ -90,6 +90,8 @@ ingress:
     service: http://localhost:8080
   - hostname: "editor.$DOMAIN"
     service: http://localhost:8080
+  - hostname: "developer.$DOMAIN"
+    service: http://localhost:8080
   
   # Development tools
   - hostname: "adminer.$DOMAIN"
@@ -133,6 +135,7 @@ show_development_urls() {
     echo "  • https://vscode.${DOMAIN}"
     echo "  • https://code.${DOMAIN}"
     echo "  • https://editor.${DOMAIN}"
+    echo "  • https://developer.${DOMAIN}"
     echo
     log "${GREEN}Development Tools:${NC}"
     echo "  • Adminer: https://adminer.${DOMAIN} (port 8081)"
