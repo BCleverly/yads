@@ -956,10 +956,16 @@ main() {
     esac
 }
 
-# Source additional modules
-source "$(dirname "$0")/modules/install.sh" 2>/dev/null || true
-source "$(dirname "$0")/modules/domains.sh" 2>/dev/null || true
-source "$(dirname "$0")/modules/projects.sh" 2>/dev/null || true
+# Source additional modules (only if they exist and are readable)
+if [[ -f "$(dirname "$0")/modules/install.sh" ]] && [[ -r "$(dirname "$0")/modules/install.sh" ]]; then
+    source "$(dirname "$0")/modules/install.sh" 2>/dev/null || true
+fi
+if [[ -f "$(dirname "$0")/modules/domains.sh" ]] && [[ -r "$(dirname "$0")/modules/domains.sh" ]]; then
+    source "$(dirname "$0")/modules/domains.sh" 2>/dev/null || true
+fi
+if [[ -f "$(dirname "$0")/modules/projects.sh" ]] && [[ -r "$(dirname "$0")/modules/projects.sh" ]]; then
+    source "$(dirname "$0")/modules/projects.sh" 2>/dev/null || true
+fi
 
 # Run main function with all arguments
 main "$@"
