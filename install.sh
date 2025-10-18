@@ -99,8 +99,13 @@ add_to_path() {
     # Add to shell configuration
     for shell_config in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
         if [[ -f "$shell_config" ]]; then
-            echo "export PATH=\"$YADS_INSTALL_DIR:\$PATH\"" >> "$shell_config"
-            success "Added to $shell_config"
+            # Check if PATH export already exists
+            if ! grep -q "export PATH.*$YADS_INSTALL_DIR" "$shell_config"; then
+                echo "export PATH=\"$YADS_INSTALL_DIR:\$PATH\"" >> "$shell_config"
+                success "Added to $shell_config"
+            else
+                info "Already configured in $shell_config"
+            fi
         fi
     done
     
@@ -114,11 +119,13 @@ add_to_path() {
 create_symlink() {
     info "Creating symlink..."
     
-    # Create symlink in /usr/local/bin if possible
+    # Try to create system-wide symlink
     if sudo ln -sf "$YADS_INSTALL_DIR/yads" /usr/local/bin/yads 2>/dev/null; then
-        success "Symlink created in /usr/local/bin"
+        success "System-wide symlink created in /usr/local/bin"
+        success "YADS is now available globally as 'yads'"
     else
         warning "Could not create system-wide symlink. YADS is available in your PATH."
+        info "You can run YADS with: $YADS_INSTALL_DIR/yads"
     fi
 }
 
@@ -127,8 +134,11 @@ verify_installation() {
     info "Verifying installation..."
     
     if command -v yads &> /dev/null; then
-        success "YADS is installed and available"
-        yads --help
+        success "YADS is installed and available globally"
+        success "You can now use 'yads' from anywhere in your system"
+        echo
+        info "Testing YADS functionality..."
+        yads help
     else
         error_exit "YADS installation failed"
     fi
@@ -138,14 +148,21 @@ verify_installation() {
 show_next_steps() {
     log "${CYAN}YADS Installation Complete!${NC}"
     echo
+    log "${GREEN}YADS is now available globally!${NC}"
+    echo "You can use 'yads' from anywhere in your system:"
+    echo "  • From any directory"
+    echo "  • From any terminal session"
+    echo "  • From scripts and automation"
+    echo
     log "${GREEN}Next steps:${NC}"
-    echo "1. Run 'yads install' to set up your development server"
-    echo "2. Run 'yads domains' to configure your domain"
-    echo "3. Run 'yads create <project>' to create your first project"
+    echo "1. Run 'yads prerequisites' to check your system"
+    echo "2. Run 'yads install' to set up your development server"
+    echo "3. Run 'yads domains' to configure your domain"
+    echo "4. Run 'yads create <project>' to create your first project"
     echo
     log "${BLUE}For help, run: yads help${NC}"
     echo
-    log "${YELLOW}Note: You may need to restart your terminal or run 'source ~/.bashrc' to use YADS${NC}"
+    log "${YELLOW}Note: If YADS is not immediately available, restart your terminal or run 'source ~/.bashrc'${NC}"
 }
 
 # Main installation function

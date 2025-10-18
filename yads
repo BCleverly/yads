@@ -117,6 +117,8 @@ ${GREEN}Commands:${NC}
     ${YELLOW}domains${NC}           Configure domain settings and SSL certificates
     ${YELLOW}create <project>${NC}  Create a new PHP project with proper configuration
     ${YELLOW}status${NC}            Show current installation status
+    ${YELLOW}prerequisites${NC}     Check system prerequisites before installation
+    ${YELLOW}check${NC}             Verify YADS global availability
     ${YELLOW}update${NC}            Update installed software
     ${YELLOW}uninstall${NC}         Remove all YADS components
     ${YELLOW}help${NC}              Show this help message
@@ -126,6 +128,33 @@ ${GREEN}Examples:${NC}
     yads domains
     yads create my-laravel-app
     yads status
+
+${GREEN}Prerequisites for Installation:${NC}
+    ${YELLOW}System Requirements:${NC}
+    • Operating System: Ubuntu 20.04+, Debian 11+, CentOS 8+, RHEL 8+, Fedora 35+, Arch Linux
+    • Memory: Minimum 2GB RAM (4GB recommended)
+    • Storage: Minimum 10GB free space
+    • Network: Internet connection for package downloads
+    • Domain: A domain name for SSL certificates and remote access
+
+    ${YELLOW}Required Commands:${NC}
+    • curl, wget, tar, gzip, openssl
+    • sudo access (for package installation)
+    • Git (for project management)
+
+    ${YELLOW}What Gets Installed:${NC}
+    • PHP 8.4 with extensions (MySQL, PostgreSQL, Redis, Memcached, Xdebug)
+    • MySQL and PostgreSQL databases
+    • NGINX or FrankenPHP web server (your choice)
+    • Composer and Laravel installer
+    • GitHub CLI and Cursor AI CLI
+    • Cloudflare tunnel for remote access
+    • SSL certificates with Let's Encrypt
+
+    ${YELLOW}Installation Time:${NC}
+    • Fast connection: 5-10 minutes
+    • Slow connection: 15-30 minutes
+    • Total download size: ~500MB
 
 ${GREEN}Configuration:${NC}
     Config file: $CONFIG_FILE
@@ -198,6 +227,100 @@ show_status() {
     fi
 }
 
+# Check if YADS is globally available
+check_global_availability() {
+    if command -v yads &> /dev/null; then
+        success "YADS is globally available"
+        info "You can use 'yads' from anywhere in your system"
+    else
+        warning "YADS is not globally available"
+        info "You may need to restart your terminal or run 'source ~/.bashrc'"
+    fi
+}
+
+# Show prerequisites information
+show_prerequisites() {
+    log "${CYAN}YADS Installation Prerequisites${NC}"
+    echo
+    
+    log "${YELLOW}System Requirements:${NC}"
+    echo "  • Operating System: Ubuntu 20.04+, Debian 11+, CentOS 8+, RHEL 8+, Fedora 35+, Arch Linux"
+    echo "  • Memory: Minimum 2GB RAM (4GB recommended)"
+    echo "  • Storage: Minimum 10GB free space"
+    echo "  • Network: Internet connection for package downloads"
+    echo "  • Domain: A domain name for SSL certificates and remote access"
+    echo
+    
+    log "${YELLOW}Required Commands:${NC}"
+    local required_commands=("curl" "wget" "tar" "gzip" "openssl" "git")
+    for cmd in "${required_commands[@]}"; do
+        if command -v "$cmd" &> /dev/null; then
+            success "$cmd is available"
+        else
+            warning "$cmd is missing"
+        fi
+    done
+    echo
+    
+    log "${YELLOW}System Checks:${NC}"
+    
+    # Check if running as root
+    if [[ $EUID -eq 0 ]]; then
+        warning "Running as root - this is not recommended"
+    else
+        success "Running as regular user"
+    fi
+    
+    # Check sudo access
+    if sudo -n true 2>/dev/null; then
+        success "Sudo access available"
+    else
+        warning "Sudo access required - you may be prompted for password"
+    fi
+    
+    # Check internet connectivity
+    if ping -c 1 google.com &> /dev/null; then
+        success "Internet connectivity available"
+    else
+        warning "Internet connectivity issues detected"
+    fi
+    
+    # Check available disk space
+    local available_space=$(df / | awk 'NR==2 {print $4}')
+    if [[ $available_space -gt 2097152 ]]; then  # 2GB in KB
+        success "Sufficient disk space available ($(($available_space / 1024 / 1024))GB free)"
+    else
+        warning "Low disk space detected ($(($available_space / 1024 / 1024))GB free)"
+    fi
+    
+    # Check memory
+    local total_memory=$(free -m | awk 'NR==2{print $2}')
+    if [[ $total_memory -gt 1024 ]]; then
+        success "Sufficient memory available (${total_memory}MB total)"
+    else
+        warning "Low memory detected (${total_memory}MB total)"
+    fi
+    
+    echo
+    log "${YELLOW}What Gets Installed:${NC}"
+    echo "  • PHP 8.4 with extensions (MySQL, PostgreSQL, Redis, Memcached, Xdebug)"
+    echo "  • MySQL and PostgreSQL databases"
+    echo "  • NGINX or FrankenPHP web server (your choice)"
+    echo "  • Composer and Laravel installer"
+    echo "  • GitHub CLI and Cursor AI CLI"
+    echo "  • Cloudflare tunnel for remote access"
+    echo "  • SSL certificates with Let's Encrypt"
+    echo
+    
+    log "${YELLOW}Installation Time:${NC}"
+    echo "  • Fast connection: 5-10 minutes"
+    echo "  • Slow connection: 15-30 minutes"
+    echo "  • Total download size: ~500MB"
+    echo
+    
+    log "${BLUE}Ready to install? Run: yads install${NC}"
+}
+
 # Main command handler
 main() {
     case "${1:-help}" in
@@ -221,6 +344,12 @@ main() {
             ;;
         "status")
             show_status
+            ;;
+        "prerequisites"|"prereq")
+            show_prerequisites
+            ;;
+        "check"|"verify")
+            check_global_availability
             ;;
         "update")
             check_sudo

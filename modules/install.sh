@@ -719,9 +719,134 @@ configure_ssh_keys() {
     success "SSH keys configured"
 }
 
+# Check prerequisites before installation
+check_prerequisites() {
+    log "${CYAN}Checking YADS installation prerequisites...${NC}"
+    echo
+    
+    local missing_prereqs=()
+    local warnings=()
+    
+    # Check if running as root
+    if [[ $EUID -eq 0 ]]; then
+        error_exit "This script should not be run as root. Please run as a regular user with sudo privileges."
+    fi
+    
+    # Check sudo access
+    if ! sudo -n true 2>/dev/null; then
+        warning "Sudo access required. You may be prompted for your password during installation."
+    fi
+    
+    # Check internet connectivity
+    if ! ping -c 1 google.com &> /dev/null; then
+        warnings+=("Internet connectivity issues detected. Some downloads may fail.")
+    fi
+    
+    # Check available disk space (minimum 2GB)
+    local available_space=$(df / | awk 'NR==2 {print $4}')
+    if [[ $available_space -lt 2097152 ]]; then  # 2GB in KB
+        warnings+=("Low disk space detected. At least 2GB free space recommended.")
+    fi
+    
+    # Check memory (minimum 1GB)
+    local total_memory=$(free -m | awk 'NR==2{print $2}')
+    if [[ $total_memory -lt 1024 ]]; then
+        warnings+=("Low memory detected. At least 1GB RAM recommended.")
+    fi
+    
+    # Check required commands
+    local required_commands=("curl" "wget" "tar" "gzip" "openssl")
+    for cmd in "${required_commands[@]}"; do
+        if ! command -v "$cmd" &> /dev/null; then
+            missing_prereqs+=("$cmd")
+        fi
+    done
+    
+    # Check for conflicting software
+    local conflicting_software=()
+    if command -v apache2 &> /dev/null; then
+        conflicting_software+=("Apache2")
+    fi
+    if command -v httpd &> /dev/null; then
+        conflicting_software+=("Apache HTTPD")
+    fi
+    if command -v lighttpd &> /dev/null; then
+        conflicting_software+=("Lighttpd")
+    fi
+    
+    # Display prerequisites status
+    log "${BLUE}Prerequisites Check Results:${NC}"
+    echo
+    
+    # Required commands
+    if [[ ${#missing_prereqs[@]} -eq 0 ]]; then
+        success "All required commands are available"
+    else
+        error_exit "Missing required commands: ${missing_prereqs[*]}. Please install them first."
+    fi
+    
+    # Warnings
+    if [[ ${#warnings[@]} -gt 0 ]]; then
+        for warning in "${warnings[@]}"; do
+            warning "$warning"
+        done
+        echo
+    fi
+    
+    # Conflicting software
+    if [[ ${#conflicting_software[@]} -gt 0 ]]; then
+        warning "The following web servers are already installed and may conflict:"
+        for software in "${conflicting_software[@]}"; do
+            warning "  - $software"
+        done
+        echo
+        read -p "Do you want to continue anyway? (y/N): " continue_install
+        if [[ ! "$continue_install" =~ ^[Yy]$ ]]; then
+            error_exit "Installation cancelled by user"
+        fi
+    fi
+    
+    # System requirements notice
+    log "${YELLOW}System Requirements:${NC}"
+    echo "  • Operating System: Ubuntu 20.04+, Debian 11+, CentOS 8+, RHEL 8+, Fedora 35+, Arch Linux"
+    echo "  • Memory: Minimum 2GB RAM (4GB recommended)"
+    echo "  • Storage: Minimum 10GB free space"
+    echo "  • Network: Internet connection for package downloads"
+    echo "  • Domain: A domain name for SSL certificates and remote access"
+    echo
+    
+    # Installation notice
+    log "${YELLOW}Installation Notice:${NC}"
+    echo "  • This will install PHP 8.4, MySQL, PostgreSQL, and your choice of web server"
+    echo "  • Existing installations of these software will be removed for clean install"
+    echo "  • SSL certificates will be automatically configured"
+    echo "  • Cloudflare tunnel will be set up for remote access"
+    echo "  • Development tools (GitHub CLI, Cursor CLI, Composer) will be installed"
+    echo
+    
+    # Time estimate
+    log "${YELLOW}Estimated Installation Time:${NC}"
+    echo "  • Fast connection: 5-10 minutes"
+    echo "  • Slow connection: 15-30 minutes"
+    echo "  • Total download size: ~500MB"
+    echo
+    
+    # Confirmation
+    read -p "Do you want to proceed with the installation? (y/N): " confirm_install
+    if [[ ! "$confirm_install" =~ ^[Yy]$ ]]; then
+        error_exit "Installation cancelled by user"
+    fi
+    
+    success "Prerequisites check completed. Starting installation..."
+    echo
+}
+
 # Main installation function
 install_all() {
     log "${CYAN}Starting YADS installation...${NC}"
+    
+    # Check prerequisites first
+    check_prerequisites
     
     # Update system
     update_system
