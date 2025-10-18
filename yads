@@ -115,7 +115,7 @@ ${GREEN}Usage:${NC}
 ${GREEN}Commands:${NC}
     ${YELLOW}install${NC}           Install all required software and configure the development server
     ${YELLOW}domains${NC}           Configure domain settings and SSL certificates
-    ${YELLOW}create <project>${NC}  Create a new PHP project with proper configuration
+    ${YELLOW}create <project> [repo]${NC}  Create a new PHP project with optional Git repository
     ${YELLOW}status${NC}            Show current installation status
     ${YELLOW}prerequisites${NC}     Check system prerequisites before installation
     ${YELLOW}check${NC}             Verify YADS global availability
@@ -127,6 +127,8 @@ ${GREEN}Examples:${NC}
     yads install
     yads domains
     yads create my-laravel-app
+    yads create erp https://github.com/user/erp-system.git
+    yads create blog user/blog-repo
     yads status
 
 ${GREEN}Prerequisites for Installation:${NC}
@@ -337,10 +339,10 @@ main() {
             ;;
         "create")
             if [[ -z "${2:-}" ]]; then
-                error_exit "Project name is required. Usage: yads create <project-name>"
+                error_exit "Project name is required. Usage: yads create <project-name> [git-repo]"
             fi
             load_config
-            create_project "$2"
+            create_project "$2" "${3:-}"
             ;;
         "status")
             show_status
