@@ -82,6 +82,9 @@ download_yads() {
         cp modules/*.sh "$YADS_INSTALL_DIR/modules/"
         chmod +x "$YADS_INSTALL_DIR/modules"/*.sh
         
+        # Create version file
+        echo "1.0.0" > "$YADS_INSTALL_DIR/version"
+        
         success "YADS copied from Git repository"
         return
     fi
@@ -102,6 +105,9 @@ download_yads() {
     
     # Make modules executable
     chmod +x "$YADS_INSTALL_DIR/modules"/*.sh
+    
+    # Create version file
+    echo "1.0.0" > "$YADS_INSTALL_DIR/version"
     
     success "YADS downloaded from GitHub"
 }
