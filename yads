@@ -853,7 +853,7 @@ upgrade_yads() {
         
         # Update version file
         info "Updating version file..."
-        echo "1.0.0" > "$HOME/.local/bin/version"
+        echo "1.0.1" > "$HOME/.local/bin/version"
         
         # Update system-wide symlink if it exists
         if [[ -L "/usr/local/bin/yads" ]]; then
@@ -917,7 +917,7 @@ get_version() {
     fi
     
     # Default version
-    echo "1.0.0"
+    echo "1.0.1"
 }
 
 # Show YADS version information

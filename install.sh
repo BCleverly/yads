@@ -83,7 +83,7 @@ download_yads() {
         chmod +x "$YADS_INSTALL_DIR/modules"/*.sh
         
         # Create version file
-        echo "1.0.0" > "$YADS_INSTALL_DIR/version"
+        echo "1.0.1" > "$YADS_INSTALL_DIR/version"
         
         success "YADS copied from Git repository"
         return
@@ -107,7 +107,7 @@ download_yads() {
     chmod +x "$YADS_INSTALL_DIR/modules"/*.sh
     
     # Create version file
-    echo "1.0.0" > "$YADS_INSTALL_DIR/version"
+    echo "1.0.1" > "$YADS_INSTALL_DIR/version"
     
     success "YADS downloaded from GitHub"
 }
