@@ -69,6 +69,9 @@ jobs:
         sudo chmod +x /home/testuser/yads
         sudo chown testuser:testuser /home/testuser/yads
         
+        # Ensure all scripts are executable
+        chmod +x yads install.sh modules/*.sh 2>/dev/null || true
+        
         # Test as test user
         sudo -u testuser bash << 'EOF'
         cd /home/testuser

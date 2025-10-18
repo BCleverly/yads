@@ -111,6 +111,9 @@ jobs:
       run: |
         echo "Testing file permissions..."
         
+        # Set executable permissions
+        chmod +x yads install.sh modules/*.sh 2>/dev/null || true
+        
         # Check if scripts are executable
         if [[ ! -x yads ]]; then
           echo "❌ ERROR: yads script is not executable"
