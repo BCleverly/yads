@@ -1,0 +1,69 @@
+name: Auto Version Bump
+
+on:
+  push:
+    branches: [ master ]
+    paths-ignore:
+      - 'README.md'
+      - '.gitignore'
+
+jobs:
+  version-bump:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Get current version
+      id: current-version
+      run: |
+        # Get the latest tag
+        latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+        current_version="${latest_tag#v}"
+        echo "current=$current_version" >> $GITHUB_OUTPUT
+    
+    - name: Bump version
+      id: bump-version
+      run: |
+        current="${{ steps.current-version.outputs.current }}"
+        
+        # Split version into parts
+        IFS='.' read -r major minor patch <<< "$current"
+        
+        # Bump patch version
+        patch=$((patch + 1))
+        new_version="$major.$minor.$patch"
+        
+        echo "new=$new_version" >> $GITHUB_OUTPUT
+        echo "New version: $new_version"
+    
+    - name: Update version files
+      run: |
+        new_version="${{ steps.bump-version.outputs.new }}"
+        
+        # Create version file
+        echo "$new_version" > version
+        
+        # Update version in yads script if needed
+        if grep -q "echo \"1.0.0\"" yads; then
+          sed -i "s/echo \"1.0.0\"/echo \"$new_version\"/" yads
+        fi
+    
+    - name: Commit version bump
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add version yads
+        git commit -m "Auto-bump version to v${{ steps.bump-version.outputs.new }}" || exit 0
+    
+    - name: Create tag
+      run: |
+        git tag -a "v${{ steps.bump-version.outputs.new }}" -m "Release v${{ steps.bump-version.outputs.new }}"
+    
+    - name: Push changes
+      run: |
+        git push origin master
+        git push origin "v${{ steps.bump-version.outputs.new }}"

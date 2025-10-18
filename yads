@@ -816,18 +816,43 @@ upgrade_yads() {
         
         # Show version info
         info "Current YADS version:"
-        yads --version 2>/dev/null || echo "Version information not available"
+        yads version 2>/dev/null || echo "Version information not available"
         
     else
         error_exit "YADS not found in standard installation location. Please reinstall YADS."
     fi
 }
 
+# Get YADS version
+get_version() {
+    # Try to get version from git describe first
+    if command -v git &> /dev/null && [[ -d ".git" ]]; then
+        local git_version=$(git describe --tags --always 2>/dev/null)
+        if [[ -n "$git_version" ]]; then
+            echo "$git_version"
+            return
+        fi
+    fi
+    
+    # Fallback to version file if it exists
+    if [[ -f "$YADS_DIR/version" ]]; then
+        cat "$YADS_DIR/version"
+        return
+    fi
+    
+    # Default version
+    echo "1.0.0"
+}
+
 # Show YADS version information
 show_version() {
+    local version=$(get_version)
+    local git_commit=$(git rev-parse --short HEAD 2>/dev/null || echo 'Unknown')
+    local git_date=$(git log -1 --format=%cd --date=short 2>/dev/null || echo 'Unknown')
+    
     log "${CYAN}YADS - Yet Another Development Server${NC}"
     echo
-    echo -e "${GREEN}Version:${NC} 1.0.0"
+    echo -e "${GREEN}Version:${NC} $version"
     echo -e "${GREEN}Repository:${NC} https://github.com/BCleverly/yads"
     echo -e "${GREEN}Installation:${NC} $HOME/.local/bin/yads"
     echo
@@ -836,8 +861,10 @@ show_version() {
     echo "  • domains.sh - Domain and SSL certificate management"
     echo "  • projects.sh - Project creation and management"
     echo
-    echo -e "${GREEN}Last Updated:${NC} $(date '+%Y-%m-%d %H:%M:%S')"
-    echo -e "${GREEN}Git Commit:${NC} $(git rev-parse --short HEAD 2>/dev/null || echo 'Unknown')"
+    echo -e "${GREEN}Git Information:${NC}"
+    echo "  • Commit: $git_commit"
+    echo "  • Date: $git_date"
+    echo "  • Branch: $(git branch --show-current 2>/dev/null || echo 'Unknown')"
 }
 
 # Check for no-color flag
