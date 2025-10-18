@@ -156,6 +156,7 @@ show_help() {
     echo -e "    ${YELLOW}ssh${NC}               Set up SSH keys for Git integration"
     echo -e "    ${YELLOW}update${NC}            Update installed software"
     echo -e "    ${YELLOW}upgrade${NC}           Upgrade YADS to latest version"
+    echo -e "    ${YELLOW}version${NC}           Show YADS version information"
     echo -e "    ${YELLOW}uninstall${NC}         Remove all YADS components"
     echo -e "    ${YELLOW}help${NC}              Show this help message"
     echo
@@ -170,6 +171,7 @@ show_help() {
     echo "    yads projects"
     echo "    yads ssh"
     echo "    yads upgrade"
+    echo "    yads version"
     echo "    yads status"
     echo
     echo -e "${GREEN}Prerequisites for Installation:${NC}"
@@ -821,6 +823,23 @@ upgrade_yads() {
     fi
 }
 
+# Show YADS version information
+show_version() {
+    log "${CYAN}YADS - Yet Another Development Server${NC}"
+    echo
+    echo -e "${GREEN}Version:${NC} 1.0.0"
+    echo -e "${GREEN}Repository:${NC} https://github.com/BCleverly/yads"
+    echo -e "${GREEN}Installation:${NC} $HOME/.local/bin/yads"
+    echo
+    echo -e "${GREEN}Modules:${NC}"
+    echo "  • install.sh - Software installation and configuration"
+    echo "  • domains.sh - Domain and SSL certificate management"
+    echo "  • projects.sh - Project creation and management"
+    echo
+    echo -e "${GREEN}Last Updated:${NC} $(date '+%Y-%m-%d %H:%M:%S')"
+    echo -e "${GREEN}Git Commit:${NC} $(git rev-parse --short HEAD 2>/dev/null || echo 'Unknown')"
+}
+
 # Check for no-color flag
 if [[ "${1:-}" == "--no-color" ]]; then
     # Force no colors
@@ -879,6 +898,9 @@ main() {
             ;;
         "upgrade")
             upgrade_yads
+            ;;
+        "version"|"--version"|"-v")
+            show_version
             ;;
         "uninstall")
             check_sudo
