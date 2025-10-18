@@ -34,20 +34,25 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Function to remove service if it exists
+# Function to remove service if it exists (with permission)
 remove_service() {
     local service_name="$1"
-    if systemctl is-active --quiet "$service_name" 2>/dev/null; then
-        echo -e "${YELLOW}Stopping $service_name service...${NC}"
-        sudo systemctl stop "$service_name" 2>/dev/null || true
-    fi
-    if systemctl is-enabled --quiet "$service_name" 2>/dev/null; then
-        echo -e "${YELLOW}Disabling $service_name service...${NC}"
-        sudo systemctl disable "$service_name" 2>/dev/null || true
-    fi
-    if [[ -f "/etc/systemd/system/$service_name.service" ]]; then
-        echo -e "${YELLOW}Removing $service_name service file...${NC}"
-        sudo rm -f "/etc/systemd/system/$service_name.service" 2>/dev/null || true
+    if systemctl is-active --quiet "$service_name" 2>/dev/null || systemctl is-enabled --quiet "$service_name" 2>/dev/null; then
+        echo
+        echo -e "${YELLOW}Service '$service_name' is installed and/or running.${NC}"
+        read -p "Do you want to remove the '$service_name' service? [y/N]: " REMOVE_SERVICE
+        if [[ "$REMOVE_SERVICE" =~ ^[yY]$ ]]; then
+            echo -e "${YELLOW}Stopping $service_name service...${NC}"
+            sudo systemctl stop "$service_name" 2>/dev/null || true
+            echo -e "${YELLOW}Disabling $service_name service...${NC}"
+            sudo systemctl disable "$service_name" 2>/dev/null || true
+            if [[ -f "/etc/systemd/system/$service_name.service" ]]; then
+                echo -e "${YELLOW}Removing $service_name service file...${NC}"
+                sudo rm -f "/etc/systemd/system/$service_name.service" 2>/dev/null || true
+            fi
+        else
+            echo -e "${YELLOW}Skipping $service_name service removal.${NC}"
+        fi
     fi
 }
 
@@ -122,9 +127,18 @@ echo -e "${BLUE}Step 5: Cleaning up Docker containers...${NC}"
 
 # Remove YADS Docker containers if they exist
 if command_exists docker; then
-    echo -e "${YELLOW}Removing YADS Docker containers...${NC}"
-    docker stop yads-project-browser 2>/dev/null || true
-    docker rm yads-project-browser 2>/dev/null || true
+    if docker ps -a --format "table {{.Names}}" | grep -q "yads-project-browser"; then
+        echo
+        echo -e "${YELLOW}Docker container 'yads-project-browser' is found.${NC}"
+        read -p "Do you want to remove the 'yads-project-browser' Docker container? [y/N]: " REMOVE_DOCKER
+        if [[ "$REMOVE_DOCKER" =~ ^[yY]$ ]]; then
+            echo -e "${YELLOW}Removing YADS Docker containers...${NC}"
+            docker stop yads-project-browser 2>/dev/null || true
+            docker rm yads-project-browser 2>/dev/null || true
+        else
+            echo -e "${YELLOW}Skipping Docker container removal.${NC}"
+        fi
+    fi
 fi
 
 echo -e "${BLUE}Step 6: Cleaning up SSH keys (selective)...${NC}"

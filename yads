@@ -556,32 +556,78 @@ uninstall_yads() {
     
     log "${CYAN}Proceeding with YADS uninstallation...${NC}"
     
-    # Stop and disable services
-    info "Stopping and disabling all YADS services..."
-    sudo systemctl stop code-server project-browser cloudflared nginx frankenphp mysql postgresql redis-server 2>/dev/null || true
-    sudo systemctl disable code-server project-browser cloudflared nginx frankenphp mysql postgresql redis-server 2>/dev/null || true
+    # Stop and disable services (with individual confirmation)
+    info "Stopping and disabling YADS services..."
+    
+    # Check and stop each service individually
+    for service in code-server project-browser cloudflared nginx frankenphp mysql postgresql redis-server; do
+        if systemctl is-active --quiet "$service" 2>/dev/null; then
+            echo
+            warning "Service '$service' is currently running."
+            read -p "Do you want to stop and disable the '$service' service? [y/N]: " STOP_SERVICE
+            if [[ "$STOP_SERVICE" =~ ^[yY]$ ]]; then
+                info "Stopping and disabling $service..."
+                sudo systemctl stop "$service" 2>/dev/null || true
+                sudo systemctl disable "$service" 2>/dev/null || true
+            else
+                warning "Skipping $service service removal."
+            fi
+        fi
+    done
     
     # Remove Cloudflare tunnel
-    info "Removing Cloudflare tunnel..."
-    sudo cloudflared service uninstall 2>/dev/null || true
-    sudo rm -rf /etc/cloudflared /root/.cloudflared
+    if command -v cloudflared &> /dev/null; then
+        echo
+        warning "Cloudflare tunnel is installed."
+        read -p "Do you want to remove the Cloudflare tunnel? [y/N]: " REMOVE_CLOUDFLARE
+        if [[ "$REMOVE_CLOUDFLARE" =~ ^[yY]$ ]]; then
+            info "Removing Cloudflare tunnel..."
+            sudo cloudflared service uninstall 2>/dev/null || true
+            sudo rm -rf /etc/cloudflared /root/.cloudflared
+        else
+            warning "Skipping Cloudflare tunnel removal."
+        fi
+    fi
     
     # Remove Docker containers
-    info "Removing Docker containers..."
-    sudo docker stop project-browser 2>/dev/null || true
-    sudo docker rm project-browser 2>/dev/null || true
+    if command -v docker &> /dev/null; then
+        if docker ps -a --format "table {{.Names}}" | grep -q "project-browser"; then
+            echo
+            warning "Docker container 'project-browser' is found."
+            read -p "Do you want to remove the 'project-browser' Docker container? [y/N]: " REMOVE_DOCKER
+            if [[ "$REMOVE_DOCKER" =~ ^[yY]$ ]]; then
+                info "Removing Docker containers..."
+                sudo docker stop project-browser 2>/dev/null || true
+                sudo docker rm project-browser 2>/dev/null || true
+            else
+                warning "Skipping Docker container removal."
+            fi
+        fi
+    fi
     
-    # Purge packages
-    info "Purging all YADS packages..."
-    sudo apt-get remove --purge -y \
-        nginx nginx-common nginx-full \
-        php8.4* \
-        mysql-server* mysql-client* \
-        postgresql* \
-        redis-server* \
-        gh \
-        cloudflared \
-        code-server 2>/dev/null || true
+    # Purge packages (with individual confirmation)
+    echo
+    warning "The following packages will be removed if you confirm:"
+    echo "  • Web servers: nginx, frankenphp"
+    echo "  • PHP: php8.4* and related packages"
+    echo "  • Databases: mysql-server*, postgresql*"
+    echo "  • Other: redis-server*, gh, cloudflared, code-server"
+    echo
+    read -p "Do you want to remove all YADS packages? [y/N]: " REMOVE_PACKAGES
+    if [[ "$REMOVE_PACKAGES" =~ ^[yY]$ ]]; then
+        info "Purging all YADS packages..."
+        sudo apt-get remove --purge -y \
+            nginx nginx-common nginx-full \
+            php8.4* \
+            mysql-server* mysql-client* \
+            postgresql* \
+            redis-server* \
+            gh \
+            cloudflared \
+            code-server 2>/dev/null || true
+    else
+        warning "Skipping package removal."
+    fi
     
     # Remove manually installed binaries
     info "Removing manually installed binaries..."
