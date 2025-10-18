@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 YADS_INSTALL_DIR="$HOME/.local/bin"
-YADS_REPO_URL="https://raw.githubusercontent.com/your-repo/yads/main"
+YADS_REPO_URL="https://raw.githubusercontent.com/BCleverly/yads/main"
 
 # Logging function
 log() {
