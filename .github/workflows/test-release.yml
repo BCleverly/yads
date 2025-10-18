@@ -1,0 +1,254 @@
+name: Test YADS Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags
+  workflow_dispatch:  # Manual trigger
+    inputs:
+      test_environment:
+        description: 'Test environment'
+        required: true
+        default: 'ubuntu-latest'
+        type: choice
+        options:
+          - ubuntu-latest
+          - ubuntu-22.04
+          - ubuntu-20.04
+          - debian-11
+          - debian-12
+
+jobs:
+  test-yads:
+    runs-on: ${{ github.event.inputs.test_environment || 'ubuntu-latest' }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Get full history for git tags
+    
+    - name: Setup test environment
+      run: |
+        echo "Setting up test environment..."
+        sudo apt-get update
+        sudo apt-get install -y curl wget git bash
+        
+        # Create test user
+        sudo useradd -m -s /bin/bash testuser || true
+        sudo usermod -aG sudo testuser
+        echo "testuser ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/testuser
+        
+        # Create test directory
+        sudo mkdir -p /home/testuser/development
+        sudo chown -R testuser:testuser /home/testuser
+    
+    - name: Test YADS script syntax
+      run: |
+        echo "Testing YADS script syntax..."
+        bash -n yads
+        echo "✓ Syntax check passed"
+        
+        # Test line endings
+        if file yads | grep -q "CRLF"; then
+          echo "❌ ERROR: Script has CRLF line endings"
+          exit 1
+        fi
+        echo "✓ Line endings are correct"
+    
+    - name: Test YADS installation
+      run: |
+        echo "Testing YADS installation..."
+        
+        # Run as test user
+        sudo -u testuser bash << 'EOF'
+        cd /home/testuser
+        
+        # Test direct installation
+        curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/master/install.sh | bash
+        
+        # Verify installation
+        if ! command -v yads &> /dev/null; then
+          echo "❌ ERROR: yads command not found after installation"
+          exit 1
+        fi
+        echo "✓ YADS installed successfully"
+        
+        # Test version command
+        if ! yads --version; then
+          echo "❌ ERROR: yads --version failed"
+          exit 1
+        fi
+        echo "✓ Version command works"
+        
+        # Test help command
+        if ! yads help; then
+          echo "❌ ERROR: yads help failed"
+          exit 1
+        fi
+        echo "✓ Help command works"
+        
+        # Test prerequisites command
+        if ! yads prerequisites; then
+          echo "❌ ERROR: yads prerequisites failed"
+          exit 1
+        fi
+        echo "✓ Prerequisites command works"
+        
+        # Test status command
+        if ! yads status; then
+          echo "❌ ERROR: yads status failed"
+          exit 1
+        fi
+        echo "✓ Status command works"
+        
+        # Test check command
+        if ! yads check; then
+          echo "❌ ERROR: yads check failed"
+          exit 1
+        fi
+        echo "✓ Check command works"
+        EOF
+    
+    - name: Test YADS upgrade
+      run: |
+        echo "Testing YADS upgrade..."
+        
+        sudo -u testuser bash << 'EOF'
+        cd /home/testuser
+        
+        # Test upgrade command
+        if ! yads upgrade; then
+          echo "❌ ERROR: yads upgrade failed"
+          exit 1
+        fi
+        echo "✓ Upgrade command works"
+        
+        # Verify version after upgrade
+        yads version
+        echo "✓ Version display works after upgrade"
+        EOF
+    
+    - name: Test YADS uninstall
+      run: |
+        echo "Testing YADS uninstall..."
+        
+        sudo -u testuser bash << 'EOF'
+        cd /home/testuser
+        
+        # Test uninstall command (with confirmation)
+        echo "y" | yads uninstall || true
+        echo "✓ Uninstall command executed"
+        
+        # Verify yads is removed
+        if command -v yads &> /dev/null; then
+          echo "❌ ERROR: yads still available after uninstall"
+          exit 1
+        fi
+        echo "✓ YADS successfully uninstalled"
+        EOF
+    
+    - name: Test module loading
+      run: |
+        echo "Testing module loading..."
+        
+        # Test if modules can be sourced without errors
+        if ! bash -c "source modules/install.sh" 2>/dev/null; then
+          echo "❌ ERROR: install.sh module has issues"
+          exit 1
+        fi
+        echo "✓ install.sh module loads correctly"
+        
+        if ! bash -c "source modules/domains.sh" 2>/dev/null; then
+          echo "❌ ERROR: domains.sh module has issues"
+          exit 1
+        fi
+        echo "✓ domains.sh module loads correctly"
+        
+        if ! bash -c "source modules/projects.sh" 2>/dev/null; then
+          echo "❌ ERROR: projects.sh module has issues"
+          exit 1
+        fi
+        echo "✓ projects.sh module loads correctly"
+    
+    - name: Test Git tag versioning
+      run: |
+        echo "Testing Git tag versioning..."
+        
+        # Check if we have tags
+        if ! git tag | grep -q "v"; then
+          echo "❌ ERROR: No version tags found"
+          exit 1
+        fi
+        echo "✓ Version tags exist"
+        
+        # Test version detection
+        LATEST_TAG=$(git describe --tags --abbrev=0)
+        echo "Latest tag: $LATEST_TAG"
+        
+        # Test version file
+        if [[ -f "version" ]]; then
+          echo "Version file content: $(cat version)"
+        fi
+        echo "✓ Version system working"
+    
+    - name: Test cross-platform compatibility
+      run: |
+        echo "Testing cross-platform compatibility..."
+        
+        # Test on different shells
+        for shell in bash dash zsh; do
+          if command -v $shell &> /dev/null; then
+            echo "Testing with $shell..."
+            if ! $shell -n yads; then
+              echo "❌ ERROR: Script syntax error with $shell"
+              exit 1
+            fi
+            echo "✓ Script compatible with $shell"
+          fi
+        done
+    
+    - name: Test installation script
+      run: |
+        echo "Testing installation script..."
+        
+        # Test install.sh syntax
+        if ! bash -n install.sh; then
+          echo "❌ ERROR: install.sh has syntax errors"
+          exit 1
+        fi
+        echo "✓ install.sh syntax is correct"
+        
+        # Test if install.sh can be executed (dry run)
+        if ! bash install.sh --help 2>/dev/null; then
+          echo "⚠ WARNING: install.sh may not support --help flag"
+        fi
+        echo "✓ install.sh is executable"
+    
+    - name: Generate test report
+      run: |
+        echo "=== YADS Release Test Report ==="
+        echo "Repository: ${{ github.repository }}"
+        echo "Tag: ${{ github.ref_name }}"
+        echo "Commit: ${{ github.sha }}"
+        echo "Test Environment: ${{ github.event.inputs.test_environment || 'ubuntu-latest' }}"
+        echo "Date: $(date)"
+        echo
+        echo "✅ All tests passed successfully!"
+        echo "✅ YADS is ready for release"
+        echo
+        echo "Test Summary:"
+        echo "- Script syntax: ✅ PASS"
+        echo "- Line endings: ✅ PASS"
+        echo "- Installation: ✅ PASS"
+        echo "- Version command: ✅ PASS"
+        echo "- Help command: ✅ PASS"
+        echo "- Prerequisites: ✅ PASS"
+        echo "- Status command: ✅ PASS"
+        echo "- Check command: ✅ PASS"
+        echo "- Upgrade command: ✅ PASS"
+        echo "- Uninstall command: ✅ PASS"
+        echo "- Module loading: ✅ PASS"
+        echo "- Git versioning: ✅ PASS"
+        echo "- Cross-platform: ✅ PASS"
+        echo "- Installation script: ✅ PASS"

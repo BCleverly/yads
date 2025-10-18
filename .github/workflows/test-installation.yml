@@ -1,0 +1,208 @@
+name: Test YADS Installation
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  test-installation:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup test environment
+      run: |
+        echo "Setting up clean test environment..."
+        
+        # Install basic dependencies
+        sudo apt-get update
+        sudo apt-get install -y curl wget git bash
+        
+        # Create test user
+        sudo useradd -m -s /bin/bash testuser || true
+        sudo usermod -aG sudo testuser
+        echo "testuser ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/testuser
+        
+        # Create test directory
+        sudo mkdir -p /home/testuser/development
+        sudo chown -R testuser:testuser /home/testuser
+    
+    - name: Test installation script
+      run: |
+        echo "Testing YADS installation script..."
+        
+        # Test the installation script directly
+        sudo -u testuser bash << 'EOF'
+        cd /home/testuser
+        
+        # Test if install.sh can be executed
+        if ! bash install.sh --help 2>/dev/null; then
+          echo "⚠ WARNING: install.sh may not support --help flag"
+        fi
+        
+        # Test if install.sh has proper structure
+        if ! grep -q "YADS" install.sh; then
+          echo "❌ ERROR: install.sh missing YADS branding"
+          exit 1
+        fi
+        echo "✅ install.sh has proper structure"
+        
+        # Test if install.sh can download yads script
+        if ! grep -q "curl.*yads" install.sh; then
+          echo "❌ ERROR: install.sh missing download logic"
+          exit 1
+        fi
+        echo "✅ install.sh has download logic"
+        EOF
+    
+    - name: Test yads script functionality
+      run: |
+        echo "Testing yads script functionality..."
+        
+        # Copy yads script to test location
+        sudo cp yads /home/testuser/
+        sudo chmod +x /home/testuser/yads
+        sudo chown testuser:testuser /home/testuser/yads
+        
+        # Test as test user
+        sudo -u testuser bash << 'EOF'
+        cd /home/testuser
+        
+        # Test version command
+        if ! ./yads --version; then
+          echo "❌ ERROR: yads --version failed"
+          exit 1
+        fi
+        echo "✅ yads --version works"
+        
+        # Test help command
+        if ! ./yads help; then
+          echo "❌ ERROR: yads help failed"
+          exit 1
+        fi
+        echo "✅ yads help works"
+        
+        # Test prerequisites command
+        if ! ./yads prerequisites; then
+          echo "❌ ERROR: yads prerequisites failed"
+          exit 1
+        fi
+        echo "✅ yads prerequisites works"
+        
+        # Test status command
+        if ! ./yads status; then
+          echo "❌ ERROR: yads status failed"
+          exit 1
+        fi
+        echo "✅ yads status works"
+        
+        # Test check command
+        if ! ./yads check; then
+          echo "❌ ERROR: yads check failed"
+          exit 1
+        fi
+        echo "✅ yads check works"
+        EOF
+    
+    - name: Test module availability
+      run: |
+        echo "Testing module availability..."
+        
+        # Copy modules to test location
+        sudo mkdir -p /home/testuser/modules
+        sudo cp modules/*.sh /home/testuser/modules/
+        sudo chmod +x /home/testuser/modules/*.sh
+        sudo chown -R testuser:testuser /home/testuser/modules
+        
+        # Test module loading
+        sudo -u testuser bash << 'EOF'
+        cd /home/testuser
+        
+        # Test if modules can be sourced
+        for module in modules/*.sh; do
+          if [[ -f "$module" ]]; then
+            if ! bash -c "source $module" 2>/dev/null; then
+              echo "❌ ERROR: $module cannot be sourced"
+              exit 1
+            fi
+            echo "✅ $module loads correctly"
+          fi
+        done
+        EOF
+    
+    - name: Test global installation
+      run: |
+        echo "Testing global installation process..."
+        
+        # Test the installation process
+        sudo -u testuser bash << 'EOF'
+        cd /home/testuser
+        
+        # Simulate installation by copying files
+        mkdir -p ~/.local/bin
+        cp yads ~/.local/bin/
+        chmod +x ~/.local/bin/yads
+        
+        # Add to PATH
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+        source ~/.bashrc
+        
+        # Test global availability
+        if ! command -v yads &> /dev/null; then
+          echo "❌ ERROR: yads not available globally"
+          exit 1
+        fi
+        echo "✅ yads is globally available"
+        
+        # Test from different directory
+        cd /tmp
+        if ! yads --version; then
+          echo "❌ ERROR: yads --version failed from different directory"
+          exit 1
+        fi
+        echo "✅ yads works from different directory"
+        EOF
+    
+    - name: Test error handling
+      run: |
+        echo "Testing error handling..."
+        
+        sudo -u testuser bash << 'EOF'
+        cd /home/testuser
+        
+        # Test invalid commands
+        if ./yads invalid-command 2>/dev/null; then
+          echo "❌ ERROR: yads should fail on invalid commands"
+          exit 1
+        fi
+        echo "✅ yads properly handles invalid commands"
+        
+        # Test missing arguments
+        if ./yads create 2>/dev/null; then
+          echo "❌ ERROR: yads should fail on missing arguments"
+          exit 1
+        fi
+        echo "✅ yads properly handles missing arguments"
+        EOF
+    
+    - name: Generate installation test report
+      run: |
+        echo "=== YADS Installation Test Report ==="
+        echo "Repository: ${{ github.repository }}"
+        echo "Branch: ${{ github.ref_name }}"
+        echo "Commit: ${{ github.sha }}"
+        echo "Date: $(date)"
+        echo
+        echo "✅ All installation tests passed!"
+        echo
+        echo "Test Summary:"
+        echo "- Installation script: ✅ PASS"
+        echo "- Script functionality: ✅ PASS"
+        echo "- Module availability: ✅ PASS"
+        echo "- Global installation: ✅ PASS"
+        echo "- Error handling: ✅ PASS"
