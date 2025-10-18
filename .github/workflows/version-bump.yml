@@ -1,11 +1,14 @@
 name: Auto Version Bump
 
 on:
+  workflow_dispatch:  # Manual trigger only
   push:
     branches: [ master ]
     paths-ignore:
       - 'README.md'
       - '.gitignore'
+      - 'version'
+      - 'bump-version.sh'
 
 jobs:
   version-bump:
@@ -16,6 +19,7 @@ jobs:
       with:
         fetch-depth: 0
         token: ${{ secrets.GITHUB_TOKEN }}
+        persist-credentials: true
     
     - name: Get current version
       id: current-version
@@ -52,18 +56,8 @@ jobs:
           sed -i "s/echo \"1.0.0\"/echo \"$new_version\"/" yads
         fi
     
-    - name: Commit version bump
+    - name: Create version artifact
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add version yads
-        git commit -m "Auto-bump version to v${{ steps.bump-version.outputs.new }}" || exit 0
-    
-    - name: Create tag
-      run: |
-        git tag -a "v${{ steps.bump-version.outputs.new }}" -m "Release v${{ steps.bump-version.outputs.new }}"
-    
-    - name: Push changes
-      run: |
-        git push origin master
-        git push origin "v${{ steps.bump-version.outputs.new }}"
+        echo "Version bumped to v${{ steps.bump-version.outputs.new }}"
+        echo "This version will be available in the next release"
+        echo "To create a release, run: git tag v${{ steps.bump-version.outputs.new }} && git push origin v${{ steps.bump-version.outputs.new }}"

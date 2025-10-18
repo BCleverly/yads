@@ -86,6 +86,8 @@ main() {
     echo -e "${BLUE}Next steps:${NC}"
     echo "  git push origin master"
     echo "  git push origin v$new_version"
+    echo
+    echo -e "${YELLOW}Note: Run the push commands above to make the new version available for upgrades${NC}"
 }
 
 # Run main function
