@@ -148,11 +148,6 @@ show_development_urls() {
     echo "  • phpMyAdmin: https://phpmyadmin.${DOMAIN} (port 8082)"
     echo "  • MailHog: https://mailhog.${DOMAIN} (port 8025)"
     echo
-    log "${GREEN}Project Browser:${NC}"
-    echo "  • https://projects.${DOMAIN} (browse all projects)"
-    echo "  • https://erp.projects.${DOMAIN} (browse specific project)"
-    echo "  • https://blog.projects.${DOMAIN} (browse specific project)"
-    echo
     log "${GREEN}Your Projects:${NC}"
     echo "  • https://*.${DOMAIN} (wildcard for all projects)"
     echo "  • https://${DOMAIN} (root domain)"
