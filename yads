@@ -1,0 +1,249 @@
+#!/bin/bash
+
+# YADS - Yet Another Development Server
+# A comprehensive PHP development server setup script
+
+set -euo pipefail
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Configuration
+YADS_DIR="$HOME/.yads"
+CONFIG_FILE="$YADS_DIR/config"
+LOG_FILE="$YADS_DIR/yads.log"
+
+# Create YADS directory if it doesn't exist
+mkdir -p "$YADS_DIR"
+
+# Logging function
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_FILE"
+    echo -e "$1"
+}
+
+# Error handling
+error_exit() {
+    log "${RED}ERROR: $1${NC}"
+    exit 1
+}
+
+# Success message
+success() {
+    log "${GREEN}✓ $1${NC}"
+}
+
+# Warning message
+warning() {
+    log "${YELLOW}⚠ $1${NC}"
+}
+
+# Info message
+info() {
+    log "${BLUE}ℹ $1${NC}"
+}
+
+# Check if running as root
+check_root() {
+    if [[ $EUID -eq 0 ]]; then
+        error_exit "This script should not be run as root. Please run as a regular user with sudo privileges."
+    fi
+}
+
+# Check if sudo is available
+check_sudo() {
+    if ! command -v sudo &> /dev/null; then
+        error_exit "sudo is required but not installed. Please install sudo first."
+    fi
+}
+
+# Detect OS
+detect_os() {
+    if [[ -f /etc/os-release ]]; then
+        . /etc/os-release
+        OS=$ID
+        OS_VERSION=$VERSION_ID
+    elif type lsb_release >/dev/null 2>&1; then
+        OS=$(lsb_release -si | tr '[:upper:]' '[:lower:]')
+        OS_VERSION=$(lsb_release -sr)
+    else
+        error_exit "Cannot detect operating system"
+    fi
+    
+    log "${CYAN}Detected OS: $OS $OS_VERSION${NC}"
+}
+
+# Load configuration
+load_config() {
+    if [[ -f "$CONFIG_FILE" ]]; then
+        source "$CONFIG_FILE"
+    else
+        # Default configuration
+        WEB_SERVER="nginx"
+        PHP_VERSION="8.4"
+        DOMAIN=""
+        CLOUDFLARE_TOKEN=""
+        GITHUB_TOKEN=""
+    fi
+}
+
+# Save configuration
+save_config() {
+    cat > "$CONFIG_FILE" << EOF
+WEB_SERVER="$WEB_SERVER"
+PHP_VERSION="$PHP_VERSION"
+DOMAIN="$DOMAIN"
+CLOUDFLARE_TOKEN="$CLOUDFLARE_TOKEN"
+GITHUB_TOKEN="$GITHUB_TOKEN"
+EOF
+}
+
+# Show help
+show_help() {
+    cat << EOF
+${CYAN}YADS - Yet Another Development Server${NC}
+
+${GREEN}Usage:${NC}
+    yads <command> [options]
+
+${GREEN}Commands:${NC}
+    ${YELLOW}install${NC}           Install all required software and configure the development server
+    ${YELLOW}domains${NC}           Configure domain settings and SSL certificates
+    ${YELLOW}create <project>${NC}  Create a new PHP project with proper configuration
+    ${YELLOW}status${NC}            Show current installation status
+    ${YELLOW}update${NC}            Update installed software
+    ${YELLOW}uninstall${NC}         Remove all YADS components
+    ${YELLOW}help${NC}              Show this help message
+
+${GREEN}Examples:${NC}
+    yads install
+    yads domains
+    yads create my-laravel-app
+    yads status
+
+${GREEN}Configuration:${NC}
+    Config file: $CONFIG_FILE
+    Log file: $LOG_FILE
+EOF
+}
+
+# Show installation status
+show_status() {
+    log "${CYAN}YADS Installation Status${NC}"
+    echo
+    
+    # Check PHP
+    if command -v php &> /dev/null; then
+        PHP_VER=$(php -v | head -n1 | cut -d' ' -f2)
+        success "PHP $PHP_VER is installed"
+    else
+        warning "PHP is not installed"
+    fi
+    
+    # Check MySQL
+    if command -v mysql &> /dev/null; then
+        success "MySQL is installed"
+    else
+        warning "MySQL is not installed"
+    fi
+    
+    # Check PostgreSQL
+    if command -v psql &> /dev/null; then
+        success "PostgreSQL is installed"
+    else
+        warning "PostgreSQL is not installed"
+    fi
+    
+    # Check Cloudflare tunnel
+    if command -v cloudflared &> /dev/null; then
+        success "Cloudflare tunnel is installed"
+    else
+        warning "Cloudflare tunnel is not installed"
+    fi
+    
+    # Check GitHub CLI
+    if command -v gh &> /dev/null; then
+        success "GitHub CLI is installed"
+    else
+        warning "GitHub CLI is not installed"
+    fi
+    
+    # Check Cursor CLI
+    if command -v cursor &> /dev/null; then
+        success "Cursor CLI is installed"
+    else
+        warning "Cursor CLI is not installed"
+    fi
+    
+    # Check Composer
+    if command -v composer &> /dev/null; then
+        success "Composer is installed"
+    else
+        warning "Composer is not installed"
+    fi
+    
+    # Check web server
+    if command -v nginx &> /dev/null; then
+        success "NGINX is installed"
+    elif command -v frankenphp &> /dev/null; then
+        success "FrankenPHP is installed"
+    else
+        warning "No web server is installed"
+    fi
+}
+
+# Main command handler
+main() {
+    case "${1:-help}" in
+        "install")
+            check_root
+            check_sudo
+            detect_os
+            load_config
+            install_all
+            ;;
+        "domains")
+            load_config
+            configure_domains
+            ;;
+        "create")
+            if [[ -z "${2:-}" ]]; then
+                error_exit "Project name is required. Usage: yads create <project-name>"
+            fi
+            load_config
+            create_project "$2"
+            ;;
+        "status")
+            show_status
+            ;;
+        "update")
+            check_sudo
+            update_software
+            ;;
+        "uninstall")
+            check_sudo
+            uninstall_all
+            ;;
+        "help"|"--help"|"-h")
+            show_help
+            ;;
+        *)
+            error_exit "Unknown command: $1. Use 'yads help' for available commands."
+            ;;
+    esac
+}
+
+# Source additional modules
+source "$(dirname "$0")/modules/install.sh" 2>/dev/null || true
+source "$(dirname "$0")/modules/domains.sh" 2>/dev/null || true
+source "$(dirname "$0")/modules/projects.sh" 2>/dev/null || true
+
+# Run main function with all arguments
+main "$@"
+
