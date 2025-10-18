@@ -155,6 +155,7 @@ show_help() {
     echo -e "    ${YELLOW}projects${NC}           Set up project browser for codebase access"
     echo -e "    ${YELLOW}ssh${NC}               Set up SSH keys for Git integration"
     echo -e "    ${YELLOW}update${NC}            Update installed software"
+    echo -e "    ${YELLOW}upgrade${NC}           Upgrade YADS to latest version"
     echo -e "    ${YELLOW}uninstall${NC}         Remove all YADS components"
     echo -e "    ${YELLOW}help${NC}              Show this help message"
     echo
@@ -168,6 +169,7 @@ show_help() {
     echo "    yads code-server"
     echo "    yads projects"
     echo "    yads ssh"
+    echo "    yads upgrade"
     echo "    yads status"
     echo
     echo -e "${GREEN}Prerequisites for Installation:${NC}"
@@ -751,6 +753,65 @@ install_github_cli() {
     success "GitHub CLI installed successfully"
 }
 
+# Upgrade YADS to latest version
+upgrade_yads() {
+    log "${CYAN}Upgrading YADS to latest version...${NC}"
+    
+    # Check if we're in a Git repository
+    if [[ -d ".git" ]] && [[ -f "yads" ]]; then
+        info "Detected Git repository installation..."
+        info "Pulling latest changes..."
+        
+        # Pull latest changes
+        if git pull origin master; then
+            success "YADS updated from Git repository"
+            info "Restart your terminal or run 'source ~/.bashrc' to use the latest version"
+        else
+            error_exit "Failed to pull latest changes from Git repository"
+        fi
+        return
+    fi
+    
+    # Check if YADS is installed in the standard location
+    if [[ -f "$HOME/.local/bin/yads" ]]; then
+        info "Upgrading YADS installation..."
+        
+        # Create backup
+        info "Creating backup of current installation..."
+        cp "$HOME/.local/bin/yads" "$HOME/.local/bin/yads.backup" 2>/dev/null || true
+        cp -r "$HOME/.local/bin/modules" "$HOME/.local/bin/modules.backup" 2>/dev/null || true
+        
+        # Download latest version
+        info "Downloading latest YADS..."
+        curl -fsSL "https://raw.githubusercontent.com/BCleverly/yads/master/yads" -o "$HOME/.local/bin/yads"
+        chmod +x "$HOME/.local/bin/yads"
+        
+        # Download latest modules
+        info "Downloading latest modules..."
+        mkdir -p "$HOME/.local/bin/modules"
+        curl -fsSL "https://raw.githubusercontent.com/BCleverly/yads/master/modules/install.sh" -o "$HOME/.local/bin/modules/install.sh"
+        curl -fsSL "https://raw.githubusercontent.com/BCleverly/yads/master/modules/domains.sh" -o "$HOME/.local/bin/modules/domains.sh"
+        curl -fsSL "https://raw.githubusercontent.com/BCleverly/yads/master/modules/projects.sh" -o "$HOME/.local/bin/modules/projects.sh"
+        chmod +x "$HOME/.local/bin/modules"/*.sh
+        
+        # Update system-wide symlink if it exists
+        if [[ -L "/usr/local/bin/yads" ]]; then
+            info "Updating system-wide symlink..."
+            sudo ln -sf "$HOME/.local/bin/yads" /usr/local/bin/yads
+        fi
+        
+        success "YADS upgraded successfully!"
+        info "You can now use the latest version of YADS"
+        
+        # Show version info
+        info "Current YADS version:"
+        yads --version 2>/dev/null || echo "Version information not available"
+        
+    else
+        error_exit "YADS not found in standard installation location. Please reinstall YADS."
+    fi
+}
+
 # Check for no-color flag
 if [[ "${1:-}" == "--no-color" ]]; then
     # Force no colors
@@ -806,6 +867,9 @@ main() {
         "update")
             check_sudo
             update_software
+            ;;
+        "upgrade")
+            upgrade_yads
             ;;
         "uninstall")
             check_sudo
