@@ -66,7 +66,27 @@ create_install_dir() {
 
 # Download YADS
 download_yads() {
-    info "Downloading YADS..."
+    # Check if we're running from a Git repository
+    if [[ -d ".git" ]] && [[ -f "yads" ]] && [[ -d "modules" ]]; then
+        info "Detected Git repository installation..."
+        info "Copying YADS from current directory..."
+        
+        # Copy from current directory
+        cp yads "$YADS_INSTALL_DIR/yads"
+        chmod +x "$YADS_INSTALL_DIR/yads"
+        
+        # Create modules directory
+        mkdir -p "$YADS_INSTALL_DIR/modules"
+        
+        # Copy modules
+        cp modules/*.sh "$YADS_INSTALL_DIR/modules/"
+        chmod +x "$YADS_INSTALL_DIR/modules"/*.sh
+        
+        success "YADS copied from Git repository"
+        return
+    fi
+    
+    info "Downloading YADS from GitHub..."
     
     # Download main script
     curl -fsSL "$YADS_REPO_URL/yads" -o "$YADS_INSTALL_DIR/yads"
@@ -83,7 +103,7 @@ download_yads() {
     # Make modules executable
     chmod +x "$YADS_INSTALL_DIR/modules"/*.sh
     
-    success "YADS downloaded"
+    success "YADS downloaded from GitHub"
 }
 
 # Add to PATH

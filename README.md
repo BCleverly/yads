@@ -26,6 +26,9 @@ A comprehensive bash script for setting up a PHP development server with remote 
    cd yads
    chmod +x install.sh
    ./install.sh
+   
+   # Note: If you clone the repository, the installer will automatically
+   # detect the Git repository and copy files locally instead of downloading
    ```
 
 2. **Install the development server:**
