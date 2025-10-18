@@ -120,6 +120,7 @@ ${GREEN}Commands:${NC}
     ${YELLOW}prerequisites${NC}     Check system prerequisites before installation
     ${YELLOW}check${NC}             Verify YADS global availability
     ${YELLOW}code-server${NC}       Set up VS Code Server for remote development
+    ${YELLOW}projects${NC}           Set up project browser for codebase access
     ${YELLOW}update${NC}            Update installed software
     ${YELLOW}uninstall${NC}         Remove all YADS components
     ${YELLOW}help${NC}              Show this help message
@@ -132,6 +133,7 @@ ${GREEN}Examples:${NC}
     yads create blog user/blog-repo
     yads domains
     yads code-server
+    yads projects
     yads status
 
 ${GREEN}Prerequisites for Installation:${NC}
@@ -403,6 +405,97 @@ show_code_server_instructions() {
     log "${YELLOW}Note: Make sure you've run 'yads domains' to configure your domain first!${NC}"
 }
 
+# Setup project browser
+setup_project_browser() {
+    log "${CYAN}Setting up Project Browser...${NC}"
+    
+    # Check if Docker is available
+    if ! command -v docker &> /dev/null; then
+        warning "Docker not found. Installing Docker..."
+        install_docker
+    else
+        success "Docker is available"
+    fi
+    
+    # Create project browser service
+    create_project_browser_service
+    
+    # Show usage instructions
+    show_project_browser_instructions
+}
+
+# Install Docker
+install_docker() {
+    info "Installing Docker..."
+    
+    # Install Docker using the official script
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sudo sh get-docker.sh
+    sudo usermod -aG docker $USER
+    
+    # Clean up
+    rm get-docker.sh
+    
+    success "Docker installed successfully"
+    warning "You may need to log out and back in for Docker group permissions to take effect"
+}
+
+# Create project browser service
+create_project_browser_service() {
+    info "Creating Project Browser service..."
+    
+    # Create service file
+    sudo tee /etc/systemd/system/project-browser.service > /dev/null << EOF
+[Unit]
+Description=Project Browser
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=$USER
+Group=$USER
+ExecStart=/bin/bash -c 'docker run -d --name project-browser -p 8083:8080 -v $HOME/development:/workspace -v /var/www/html:/var/www/html filebrowser/filebrowser --root /workspace --address 0.0.0.0 --port 8080'
+ExecStop=/bin/bash -c 'docker stop project-browser && docker rm project-browser'
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    
+    # Enable and start service
+    sudo systemctl daemon-reload
+    sudo systemctl enable project-browser
+    sudo systemctl start project-browser
+    
+    success "Project Browser service created and started"
+}
+
+# Show project browser instructions
+show_project_browser_instructions() {
+    log "${CYAN}Project Browser Setup Complete!${NC}"
+    echo
+    log "${GREEN}Access your Project Browser at:${NC}"
+    echo "  • https://projects.${DOMAIN:-yourdomain.com} (browse all projects)"
+    echo "  • https://erp.projects.${DOMAIN:-yourdomain.com} (browse ERP project)"
+    echo "  • https://blog.projects.${DOMAIN:-yourdomain.com} (browse Blog project)"
+    echo
+    log "${GREEN}Features:${NC}"
+    echo "  • Browse all your development projects"
+    echo "  • View and edit files in the browser"
+    echo "  • Download/upload files"
+    echo "  • Access from anywhere in the world"
+    echo
+    log "${GREEN}Service Management:${NC}"
+    echo "  • Start: sudo systemctl start project-browser"
+    echo "  • Stop: sudo systemctl stop project-browser"
+    echo "  • Status: sudo systemctl status project-browser"
+    echo "  • Logs: sudo journalctl -u project-browser -f"
+    echo
+    log "${YELLOW}Note: Make sure you've run 'yads domains' to configure your domain first!${NC}"
+}
+
 # Main command handler
 main() {
     case "${1:-help}" in
@@ -435,6 +528,9 @@ main() {
             ;;
         "code-server"|"vscode")
             setup_code_server
+            ;;
+        "projects"|"browser")
+            setup_project_browser
             ;;
         "update")
             check_sudo
