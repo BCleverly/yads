@@ -121,6 +121,7 @@ ${GREEN}Commands:${NC}
     ${YELLOW}check${NC}             Verify YADS global availability
     ${YELLOW}code-server${NC}       Set up VS Code Server for remote development
     ${YELLOW}projects${NC}           Set up project browser for codebase access
+    ${YELLOW}ssh${NC}               Set up SSH keys for Git integration
     ${YELLOW}update${NC}            Update installed software
     ${YELLOW}uninstall${NC}         Remove all YADS components
     ${YELLOW}help${NC}              Show this help message
@@ -134,6 +135,7 @@ ${GREEN}Examples:${NC}
     yads domains
     yads code-server
     yads projects
+    yads ssh
     yads status
 
 ${GREEN}Prerequisites for Installation:${NC}
@@ -496,6 +498,228 @@ show_project_browser_instructions() {
     log "${YELLOW}Note: Make sure you've run 'yads domains' to configure your domain first!${NC}"
 }
 
+# Uninstall YADS completely
+uninstall_yads() {
+    log "${CYAN}YADS Uninstallation${NC}"
+    echo
+    log "${RED}⚠ DANGER: DESTRUCTIVE UNINSTALLATION ⚠${NC}"
+    echo
+    warning "You are about to REMOVE all YADS software and configurations."
+    warning "This includes: PHP, MySQL, PostgreSQL, NGINX/FrankenPHP, code-server,"
+    warning "Composer, GitHub CLI, Cursor CLI, and Cloudflare tunnel."
+    echo
+    warning "This action is IRREVERSIBLE and will delete server configurations."
+    warning "It is strongly recommended that you have a backup of any important data."
+    echo
+    log "${YELLOW}To confirm this destructive action, please type the following phrase exactly:${NC}"
+    echo -e "  ${GREEN}yes I want to uninstall YADS${NC}"
+    read -p "> " CONFIRM_UNINSTALL
+    
+    if [[ "$CONFIRM_UNINSTALL" != "yes I want to uninstall YADS" ]]; then
+        error_exit "Confirmation phrase did not match. Aborting uninstallation."
+    fi
+    
+    log "${CYAN}Proceeding with YADS uninstallation...${NC}"
+    
+    # Stop and disable services
+    info "Stopping and disabling all YADS services..."
+    sudo systemctl stop code-server project-browser cloudflared nginx frankenphp mysql postgresql redis-server 2>/dev/null || true
+    sudo systemctl disable code-server project-browser cloudflared nginx frankenphp mysql postgresql redis-server 2>/dev/null || true
+    
+    # Remove Cloudflare tunnel
+    info "Removing Cloudflare tunnel..."
+    sudo cloudflared service uninstall 2>/dev/null || true
+    sudo rm -rf /etc/cloudflared /root/.cloudflared
+    
+    # Remove Docker containers
+    info "Removing Docker containers..."
+    sudo docker stop project-browser 2>/dev/null || true
+    sudo docker rm project-browser 2>/dev/null || true
+    
+    # Purge packages
+    info "Purging all YADS packages..."
+    sudo apt-get remove --purge -y \
+        nginx nginx-common nginx-full \
+        php8.4* \
+        mysql-server* mysql-client* \
+        postgresql* \
+        redis-server* \
+        gh \
+        cloudflared \
+        code-server 2>/dev/null || true
+    
+    # Remove manually installed binaries
+    info "Removing manually installed binaries..."
+    sudo rm -f /usr/local/bin/composer
+    sudo rm -f /usr/local/bin/frankenphp
+    sudo rm -f /usr/local/bin/code-server
+    sudo rm -f /usr/local/bin/cursor
+    
+    # Remove configuration files
+    info "Removing configuration files..."
+    sudo rm -rf /etc/nginx/sites-available/yads*
+    sudo rm -rf /etc/nginx/sites-enabled/yads*
+    sudo rm -rf /etc/systemd/system/code-server.service
+    sudo rm -rf /etc/systemd/system/project-browser.service
+    sudo rm -rf /etc/systemd/system/frankenphp.service
+    sudo rm -rf /etc/apt/sources.list.d/github-cli.list
+    sudo rm -rf /etc/apt/sources.list.d/ondrej-ubuntu-php-*
+    
+    # Clean up user data
+    warning "The script can also remove user-specific configurations and project data."
+    read -p "Do you want to delete the '~/development' directory? [y/N]: " DEL_DEVELOPMENT
+    if [[ "$DEL_DEVELOPMENT" =~ ^[yY]$ ]]; then
+        info "Deleting ~/development directory..."
+        rm -rf "$HOME/development"
+    fi
+    
+    read -p "Do you want to delete YADS configs (code-server, composer, cursor, ssh keys)? [y/N]: " DEL_CONFIGS
+    if [[ "$DEL_CONFIGS" =~ ^[yY]$ ]]; then
+        info "Deleting user configurations..."
+        rm -rf "$HOME/.config/code-server" \
+               "$HOME/.config/composer" \
+               "$HOME/.cursor" \
+               "$HOME/.ssh"
+    fi
+    
+    # Remove YADS directory
+    info "Removing YADS configuration..."
+    rm -rf "$HOME/.yads"
+    
+    # Remove from PATH
+    info "Removing YADS from PATH..."
+    sed -i '/export PATH.*\.local\/bin/d' "$HOME/.bashrc" 2>/dev/null || true
+    sed -i '/export PATH.*\.local\/bin/d' "$HOME/.zshrc" 2>/dev/null || true
+    sed -i '/export PATH.*\.local\/bin/d' "$HOME/.profile" 2>/dev/null || true
+    
+    # Remove system-wide symlink
+    sudo rm -f /usr/local/bin/yads
+    
+    # Revert user permissions
+    info "Removing user from www-data group..."
+    sudo gpasswd -d "$USER" www-data 2>/dev/null || true
+    
+    # Clean up APT
+    info "Cleaning up package cache..."
+    sudo apt-get autoremove -y
+    sudo apt-get autoclean
+    sudo apt-get update
+    
+    # Reload systemd
+    sudo systemctl daemon-reload
+    
+    success "YADS uninstallation complete!"
+    info "The server has been cleaned of all YADS software and configurations."
+    info "You may need to log out and back in for all changes to take effect."
+}
+
+# Setup SSH keys for Git
+setup_ssh_keys() {
+    log "${CYAN}Setting up SSH keys for Git...${NC}"
+    
+    # Check if SSH key already exists
+    if [[ -f "$HOME/.ssh/id_ed25519" ]]; then
+        warning "SSH key already exists at $HOME/.ssh/id_ed25519"
+        read -p "Do you want to generate a new key? [y/N]: " GENERATE_NEW
+        if [[ ! "$GENERATE_NEW" =~ ^[yY]$ ]]; then
+            info "Using existing SSH key"
+            show_ssh_key_info
+            return 0
+        fi
+    fi
+    
+    # Get email for SSH key
+    read -p "Enter your email address (for the SSH key comment): " GIT_EMAIL
+    if [[ -z "$GIT_EMAIL" ]]; then
+        error_exit "Email address is required for SSH key generation"
+    fi
+    
+    # Generate SSH key
+    info "Generating ED25519 SSH key..."
+    ssh-keygen -t ed25519 -C "$GIT_EMAIL" -f "$HOME/.ssh/id_ed25519" -N ""
+    chmod 600 "$HOME/.ssh/id_ed25519"
+    chmod 644 "$HOME/.ssh/id_ed25519.pub"
+    
+    success "SSH key generated successfully"
+    
+    # Show key info
+    show_ssh_key_info
+    
+    # Ask about GitHub integration
+    read -p "Do you want to automatically add this key to your GitHub account? [y/N]: " ADD_TO_GITHUB
+    if [[ "$ADD_TO_GITHUB" =~ ^[yY]$ ]]; then
+        setup_github_integration
+    else
+        info "To add your SSH key to a Git service manually, copy the public key:"
+        echo -e "${YELLOW}cat ~/.ssh/id_ed25519.pub${NC}"
+    fi
+}
+
+# Show SSH key information
+show_ssh_key_info() {
+    log "${GREEN}SSH Key Information:${NC}"
+    echo
+    echo "Public key (copy this to your Git service):"
+    echo -e "${YELLOW}$(cat ~/.ssh/id_ed25519.pub)${NC}"
+    echo
+    echo "Private key location: $HOME/.ssh/id_ed25519"
+    echo "Public key location: $HOME/.ssh/id_ed25519.pub"
+    echo
+    info "Test your SSH connection with: ssh -T git@github.com"
+}
+
+# Setup GitHub integration
+setup_github_integration() {
+    # Check if GitHub CLI is installed
+    if ! command -v gh &> /dev/null; then
+        info "Installing GitHub CLI..."
+        install_github_cli
+    else
+        success "GitHub CLI is already installed"
+    fi
+    
+    echo -e "\n${YELLOW}======================= ACTION REQUIRED =======================${NC}"
+    warning "You need to authenticate the GitHub CLI with your account."
+    warning "Please follow the prompts to authenticate with GitHub."
+    echo -e "${YELLOW}===============================================================${NC}\n"
+    
+    # Authenticate with GitHub
+    gh auth login
+    
+    if [[ $? -eq 0 ]]; then
+        success "GitHub authentication successful"
+        
+        # Add SSH key to GitHub
+        info "Uploading SSH key to GitHub..."
+        KEY_TITLE="YADS Dev Server ($(hostname))"
+        gh ssh-key add "$HOME/.ssh/id_ed25519.pub" --title "$KEY_TITLE"
+        
+        if [[ $? -eq 0 ]]; then
+            success "SSH key added to your GitHub account with title: '$KEY_TITLE'"
+        else
+            warning "Failed to add SSH key to GitHub. You can add it manually."
+        fi
+    else
+        warning "GitHub authentication failed. You can add the SSH key manually."
+    fi
+}
+
+# Install GitHub CLI
+install_github_cli() {
+    info "Installing GitHub CLI..."
+    
+    # Add GitHub CLI repository
+    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+    sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+    
+    # Update and install
+    sudo apt-get update
+    sudo apt-get install -y gh
+    
+    success "GitHub CLI installed successfully"
+}
+
 # Main command handler
 main() {
     case "${1:-help}" in
@@ -532,13 +756,16 @@ main() {
         "projects"|"browser")
             setup_project_browser
             ;;
+        "ssh"|"keys")
+            setup_ssh_keys
+            ;;
         "update")
             check_sudo
             update_software
             ;;
         "uninstall")
             check_sudo
-            uninstall_all
+            uninstall_yads
             ;;
         "help"|"--help"|"-h")
             show_help
