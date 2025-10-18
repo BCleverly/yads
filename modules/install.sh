@@ -54,20 +54,28 @@ detect_and_remove() {
             ;;
         "apache2")
             if command -v apache2 &> /dev/null || command -v httpd &> /dev/null; then
-                warning "Apache2/HTTPD is already installed. This may conflict with NGINX/FrankenPHP."
+                warning "Apache2/HTTPD is already installed. This will conflict with NGINX/FrankenPHP."
                 echo
-                log "${YELLOW}Apache2/HTTPD detected. YADS uses NGINX or FrankenPHP as web server.${NC}"
+                log "${YELLOW}⚠ CONFLICT DETECTED ⚠${NC}"
                 echo
-                log "${RED}Options:${NC}"
-                echo "1. Remove Apache2/HTTPD and continue with YADS installation"
-                echo "2. Cancel installation and keep Apache2/HTTPD"
+                log "${RED}YADS requires NGINX or FrankenPHP as web server, but Apache2/HTTPD is already installed.${NC}"
                 echo
-                read -p "Do you want to remove Apache2/HTTPD and continue? [y/N]: " REMOVE_APACHE
+                log "${YELLOW}What will happen if you continue:${NC}"
+                echo "  • Apache2/HTTPD will be COMPLETELY REMOVED"
+                echo "  • All Apache2/HTTPD services will be stopped"
+                echo "  • All Apache2/HTTPD configuration files will be deleted"
+                echo "  • YADS will install NGINX or FrankenPHP instead"
+                echo
+                log "${GREEN}Your options:${NC}"
+                echo "  [y] YES - Remove Apache2/HTTPD and continue with YADS installation"
+                echo "  [n] NO  - Cancel installation and keep Apache2/HTTPD"
+                echo
+                read -p "${RED}Do you want to REMOVE Apache2/HTTPD and continue? [y/N]: ${NC}" REMOVE_APACHE
                 if [[ "$REMOVE_APACHE" =~ ^[yY]$ ]]; then
                     info "Removing Apache2/HTTPD..."
                     remove_apache2
                 else
-                    error_exit "Installation cancelled. Please remove Apache2/HTTPD manually if you want to continue."
+                    error_exit "Installation cancelled. Apache2/HTTPD will not be removed."
                 fi
             fi
             ;;
