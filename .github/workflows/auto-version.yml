@@ -12,17 +12,18 @@ on:
       - 'manual-uninstall.sh'
       - 'fix-*.sh'
       - 'test-*.sh'
+      - '.github/workflows/version-bump.yml'
 
 jobs:
-  version-bump:
+  auto-version:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
         token: ${{ secrets.GITHUB_TOKEN }}
-        persist-credentials: true
     
     - name: Get current version
       id: current-version
@@ -31,8 +32,9 @@ jobs:
         latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
         current_version="${latest_tag#v}"
         echo "current=$current_version" >> $GITHUB_OUTPUT
+        echo "Current version: $current_version"
     
-    - name: Bump version
+    - name: Bump patch version
       id: bump-version
       run: |
         current="${{ steps.current-version.outputs.current }}"
@@ -47,30 +49,40 @@ jobs:
         echo "new=$new_version" >> $GITHUB_OUTPUT
         echo "New version: $new_version"
     
-    - name: Update version files
+    - name: Update version file
+      run: |
+        new_version="${{ steps.bump-version.outputs.new }}"
+        echo "$new_version" > version
+        echo "Updated version file to: $new_version"
+    
+    - name: Update yads script version
       run: |
         new_version="${{ steps.bump-version.outputs.new }}"
         
-        # Create version file
-        echo "$new_version" > version
+        # Update default version in get_version function
+        sed -i "s/echo \"[0-9]\+\.[0-9]\+\.[0-9]\+\"/echo \"$new_version\"/" yads
         
-        # Update version in yads script if needed
-        if grep -q "echo \"1\.[0-9]\+\.[0-9]\+\"" yads; then
-          sed -i "s/echo \"1\.[0-9]\+\.[0-9]\+\"/echo \"$new_version\"/" yads
-        fi
+        # Update upgrade function version
+        sed -i "s/echo \"[0-9]\+\.[0-9]\+\.[0-9]\+\" > \"\$HOME\/.local\/bin\/version\"/echo \"$new_version\" > \"\$HOME\/.local\/bin\/version\"/" yads
+        
+        echo "Updated yads script to version: $new_version"
     
-    - name: Commit version bump
+    - name: Commit changes
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add version yads
-        git commit -m "Auto-bump version to v${{ steps.bump-version.outputs.new }}" || exit 0
+        git commit -m "Auto-bump version to v${{ steps.bump-version.outputs.new }}" || echo "No changes to commit"
     
-    - name: Create tag
+    - name: Create and push tag
       run: |
-        git tag -a "v${{ steps.bump-version.outputs.new }}" -m "Release v${{ steps.bump-version.outputs.new }}"
-    
-    - name: Push changes
-      run: |
+        new_version="${{ steps.bump-version.outputs.new }}"
+        
+        # Create tag
+        git tag -a "v$new_version" -m "Release v$new_version"
+        
+        # Push changes and tag
         git push origin master
-        git push origin "v${{ steps.bump-version.outputs.new }}"
+        git push origin "v$new_version"
+        
+        echo "Created and pushed tag: v$new_version"
