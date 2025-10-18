@@ -18,7 +18,14 @@ A comprehensive bash script for setting up a PHP development server with remote 
 
 1. **Download and install YADS:**
    ```bash
+   # Option 1: Direct installation (requires public repository)
    curl -fsSL https://raw.githubusercontent.com/BCleverly/yads/main/install.sh | bash
+   
+   # Option 2: Clone and install (works with private repositories)
+   git clone https://github.com/BCleverly/yads.git
+   cd yads
+   chmod +x install.sh
+   ./install.sh
    ```
 
 2. **Install the development server:**
