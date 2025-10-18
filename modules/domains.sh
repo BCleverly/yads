@@ -83,10 +83,31 @@ tunnel: $TUNNEL_ID
 credentials-file: /etc/cloudflared/$TUNNEL_ID.json
 
 ingress:
+  # Code Server (VS Code Server)
+  - hostname: "vscode.$DOMAIN"
+    service: http://localhost:8080
+  - hostname: "code.$DOMAIN"
+    service: http://localhost:8080
+  - hostname: "editor.$DOMAIN"
+    service: http://localhost:8080
+  
+  # Development tools
+  - hostname: "adminer.$DOMAIN"
+    service: http://localhost:8081
+  - hostname: "phpmyadmin.$DOMAIN"
+    service: http://localhost:8082
+  - hostname: "mailhog.$DOMAIN"
+    service: http://localhost:8025
+  
+  # Project subdomains
   - hostname: "*.$DOMAIN"
     service: http://localhost:80
+  
+  # Root domain
   - hostname: "$DOMAIN"
     service: http://localhost:80
+  
+  # Catch-all
   - service: http_status:404
 EOF
     
@@ -99,6 +120,34 @@ EOF
     sudo systemctl enable cloudflared
     
     success "Cloudflare tunnel configured"
+    
+    # Show development URLs
+    show_development_urls
+}
+
+# Show development URLs
+show_development_urls() {
+    log "${CYAN}Development URLs Available:${NC}"
+    echo
+    log "${GREEN}Code Server (VS Code):${NC}"
+    echo "  • https://vscode.${DOMAIN}"
+    echo "  • https://code.${DOMAIN}"
+    echo "  • https://editor.${DOMAIN}"
+    echo
+    log "${GREEN}Development Tools:${NC}"
+    echo "  • Adminer: https://adminer.${DOMAIN} (port 8081)"
+    echo "  • phpMyAdmin: https://phpmyadmin.${DOMAIN} (port 8082)"
+    echo "  • MailHog: https://mailhog.${DOMAIN} (port 8025)"
+    echo
+    log "${GREEN}Your Projects:${NC}"
+    echo "  • https://*.${DOMAIN} (wildcard for all projects)"
+    echo "  • https://${DOMAIN} (root domain)"
+    echo
+    log "${YELLOW}To use these URLs, start the corresponding services:${NC}"
+    echo "  • Code Server: code-server --bind-addr 0.0.0.0:8080"
+    echo "  • Adminer: docker run -d -p 8081:8080 adminer"
+    echo "  • phpMyAdmin: docker run -d -p 8082:80 phpmyadmin/phpmyadmin"
+    echo "  • MailHog: docker run -d -p 8025:8025 mailhog/mailhog"
 }
 
 # Create DNS records

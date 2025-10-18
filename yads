@@ -119,6 +119,7 @@ ${GREEN}Commands:${NC}
     ${YELLOW}status${NC}            Show current installation status
     ${YELLOW}prerequisites${NC}     Check system prerequisites before installation
     ${YELLOW}check${NC}             Verify YADS global availability
+    ${YELLOW}code-server${NC}       Set up VS Code Server for remote development
     ${YELLOW}update${NC}            Update installed software
     ${YELLOW}uninstall${NC}         Remove all YADS components
     ${YELLOW}help${NC}              Show this help message
@@ -129,6 +130,8 @@ ${GREEN}Examples:${NC}
     yads create my-laravel-app
     yads create erp https://github.com/user/erp-system.git
     yads create blog user/blog-repo
+    yads domains
+    yads code-server
     yads status
 
 ${GREEN}Prerequisites for Installation:${NC}
@@ -323,6 +326,82 @@ show_prerequisites() {
     log "${BLUE}Ready to install? Run: yads install${NC}"
 }
 
+# Setup code-server
+setup_code_server() {
+    log "${CYAN}Setting up Code Server (VS Code Server)...${NC}"
+    
+    # Check if code-server is installed
+    if ! command -v code-server &> /dev/null; then
+        info "Installing code-server..."
+        
+        # Download and install code-server
+        curl -fsSL https://code-server.dev/install.sh | sh
+        
+        if [[ $? -eq 0 ]]; then
+            success "Code Server installed successfully"
+        else
+            error_exit "Failed to install Code Server"
+        fi
+    else
+        success "Code Server is already installed"
+    fi
+    
+    # Create systemd service for code-server
+    create_code_server_service
+    
+    # Show usage instructions
+    show_code_server_instructions
+}
+
+# Create code-server systemd service
+create_code_server_service() {
+    info "Creating Code Server systemd service..."
+    
+    # Create service file
+    sudo tee /etc/systemd/system/code-server.service > /dev/null << EOF
+[Unit]
+Description=Code Server
+After=network.target
+
+[Service]
+Type=simple
+User=$USER
+Group=$USER
+ExecStart=/usr/local/bin/code-server --bind-addr 0.0.0.0:8080 --auth none
+Restart=always
+RestartSec=5
+WorkingDirectory=$HOME
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    
+    # Enable and start service
+    sudo systemctl daemon-reload
+    sudo systemctl enable code-server
+    sudo systemctl start code-server
+    
+    success "Code Server service created and started"
+}
+
+# Show code-server instructions
+show_code_server_instructions() {
+    log "${CYAN}Code Server Setup Complete!${NC}"
+    echo
+    log "${GREEN}Access your VS Code Server at:${NC}"
+    echo "  • https://vscode.${DOMAIN:-yourdomain.com}"
+    echo "  • https://code.${DOMAIN:-yourdomain.com}"
+    echo "  • https://editor.${DOMAIN:-yourdomain.com}"
+    echo
+    log "${GREEN}Service Management:${NC}"
+    echo "  • Start: sudo systemctl start code-server"
+    echo "  • Stop: sudo systemctl stop code-server"
+    echo "  • Status: sudo systemctl status code-server"
+    echo "  • Logs: sudo journalctl -u code-server -f"
+    echo
+    log "${YELLOW}Note: Make sure you've run 'yads domains' to configure your domain first!${NC}"
+}
+
 # Main command handler
 main() {
     case "${1:-help}" in
@@ -352,6 +431,9 @@ main() {
             ;;
         "check"|"verify")
             check_global_availability
+            ;;
+        "code-server"|"vscode")
+            setup_code_server
             ;;
         "update")
             check_sudo
