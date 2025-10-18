@@ -52,6 +52,25 @@ detect_and_remove() {
                 remove_composer
             fi
             ;;
+        "apache2")
+            if command -v apache2 &> /dev/null || command -v httpd &> /dev/null; then
+                warning "Apache2/HTTPD is already installed. This may conflict with NGINX/FrankenPHP."
+                echo
+                log "${YELLOW}Apache2/HTTPD detected. YADS uses NGINX or FrankenPHP as web server.${NC}"
+                echo
+                log "${RED}Options:${NC}"
+                echo "1. Remove Apache2/HTTPD and continue with YADS installation"
+                echo "2. Cancel installation and keep Apache2/HTTPD"
+                echo
+                read -p "Do you want to remove Apache2/HTTPD and continue? [y/N]: " REMOVE_APACHE
+                if [[ "$REMOVE_APACHE" =~ ^[yY]$ ]]; then
+                    info "Removing Apache2/HTTPD..."
+                    remove_apache2
+                else
+                    error_exit "Installation cancelled. Please remove Apache2/HTTPD manually if you want to continue."
+                fi
+            fi
+            ;;
     esac
 }
 
@@ -168,6 +187,36 @@ remove_github_cli() {
 remove_composer() {
     sudo rm -f /usr/local/bin/composer || true
     sudo rm -f /usr/bin/composer || true
+}
+
+# Remove Apache2/HTTPD
+remove_apache2() {
+    info "Stopping Apache2/HTTPD services..."
+    sudo systemctl stop apache2 httpd 2>/dev/null || true
+    sudo systemctl disable apache2 httpd 2>/dev/null || true
+    
+    case "$OS" in
+        "ubuntu"|"debian")
+            info "Removing Apache2 packages..."
+            sudo apt-get remove --purge -y apache2 apache2-utils apache2-bin apache2-data 2>/dev/null || true
+            sudo apt-get autoremove -y 2>/dev/null || true
+            ;;
+        "centos"|"rhel"|"fedora")
+            info "Removing HTTPD packages..."
+            sudo yum remove -y httpd httpd-tools 2>/dev/null || true
+            sudo dnf remove -y httpd httpd-tools 2>/dev/null || true
+            ;;
+        "arch")
+            info "Removing Apache packages..."
+            sudo pacman -R --noconfirm apache 2>/dev/null || true
+            ;;
+    esac
+    
+    # Remove configuration files
+    info "Removing Apache2/HTTPD configuration files..."
+    sudo rm -rf /etc/apache2 /etc/httpd /var/www/html /var/log/apache2 /var/log/httpd
+    
+    success "Apache2/HTTPD removed"
 }
 
 # Update system packages
@@ -859,6 +908,9 @@ install_all() {
     install_github_cli
     install_cursor_cli
     install_cloudflared
+    
+    # Check for conflicting web servers
+    detect_and_remove "apache2" "apache2"
     
     # Choose and install web server
     choose_web_server
