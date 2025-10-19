@@ -11,8 +11,10 @@ setup_colors() {
         RED='\033[0;31m'
         GREEN='\033[0;32m'
         YELLOW='\033[1;33m'
-        BLUE='\033[0;34m'
-        CYAN='\033[0;36m'
+        BLUE='\033[0;94m'      # Light blue instead of dark blue
+        CYAN='\033[0;96m'      # Light cyan
+        WHITE='\033[1;37m'     # Bright white for better contrast
+        GRAY='\033[0;37m'      # Light gray for secondary text
         NC='\033[0m' # No Color
     else
         RED=''
@@ -20,6 +22,8 @@ setup_colors() {
         YELLOW=''
         BLUE=''
         CYAN=''
+        WHITE=''
+        GRAY=''
         NC=''
     fi
 }
