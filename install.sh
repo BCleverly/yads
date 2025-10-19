@@ -202,8 +202,50 @@ install_vscode_server() {
     cd /tmp
     wget "https://github.com/coder/code-server/releases/download/${latest_version}/code-server-${latest_version#v}-linux-amd64.tar.gz"
     tar -xzf "code-server-${latest_version#v}-linux-amd64.tar.gz"
-    cp "code-server-${latest_version#v}-linux-amd64/code-server" /usr/local/bin/
-    chmod +x /usr/local/bin/code-server
+    
+    # Check what was actually extracted
+    info "Checking extracted files..."
+    ls -la /tmp/
+    
+    # Find the code-server binary
+    local code_server_path
+    code_server_path=$(find /tmp -name "code-server" -type f 2>/dev/null | head -1)
+    
+    if [[ -z "$code_server_path" ]]; then
+        warning "code-server binary not found after extraction, trying package manager..."
+        
+        # Try installing via package manager as fallback
+        case "$OS" in
+            ubuntu|debian)
+                curl -fsSL https://code-server.dev/install.sh | sh
+                ;;
+            centos|rhel|fedora)
+                if command -v dnf >/dev/null 2>&1; then
+                    dnf install -y code-server
+                else
+                    yum install -y code-server
+                fi
+                ;;
+            arch)
+                pacman -S --noconfirm code-server
+                ;;
+            *)
+                error_exit "Cannot install VS Code Server on this OS: $OS"
+                ;;
+        esac
+        
+        # Verify installation
+        if ! command -v code-server >/dev/null 2>&1; then
+            error_exit "VS Code Server installation failed"
+        fi
+    else
+        info "Found code-server at: $code_server_path"
+        cp "$code_server_path" /usr/local/bin/
+        chmod +x /usr/local/bin/code-server
+        
+        # Clean up
+        rm -rf /tmp/code-server-*
+    fi
     
     # Create systemd service
     cat > /etc/systemd/system/vscode-server.service << EOF
