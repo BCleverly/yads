@@ -86,9 +86,8 @@ password: $password
 cert: false
 EOF
     
-    # Set proper permissions
-    chown "$vscode_user:$vscode_user" "$vscode_home/.config/code-server/config.yaml"
-    chmod 600 "$vscode_home/.config/code-server/config.yaml"
+    # Set proper permissions (file already owned by vscode user)
+    sudo -u "$vscode_user" chmod 600 "$vscode_home/.config/code-server/config.yaml"
     
     # Install useful extensions with proper Node.js environment
     info "Installing VS Code extensions..."
