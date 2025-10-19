@@ -474,6 +474,12 @@ main() {
         error_exit "Please run this script from the YADS repository directory"
     fi
     
+    # Ensure script is executable
+    if [[ ! -x "$0" ]]; then
+        warning "Making install script executable..."
+        chmod +x "$0"
+    fi
+    
     check_root
     detect_os
     
