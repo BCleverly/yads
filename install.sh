@@ -462,6 +462,38 @@ install_gh_cli() {
     success "GitHub CLI installed"
 }
 
+# Install Cursor CLI
+install_cursor_cli() {
+    info "🎯 Installing Cursor CLI..."
+    
+    if command -v cursor-agent >/dev/null 2>&1; then
+        info "Cursor CLI already installed"
+        return
+    fi
+    
+    # Install Cursor CLI using the official installer
+    curl https://cursor.com/install -fsS | bash
+    
+    # Add to PATH if not already there
+    if ! command -v cursor-agent >/dev/null 2>&1; then
+        # Try to find the installation directory
+        local cursor_path=""
+        if [[ -f "$HOME/.cursor/bin/cursor-agent" ]]; then
+            cursor_path="$HOME/.cursor/bin"
+        elif [[ -f "/usr/local/bin/cursor-agent" ]]; then
+            cursor_path="/usr/local/bin"
+        fi
+        
+        if [[ -n "$cursor_path" ]]; then
+            # Add to system PATH
+            echo "export PATH=\"$cursor_path:\$PATH\"" >> /etc/environment
+            export PATH="$cursor_path:$PATH"
+        fi
+    fi
+    
+    success "Cursor CLI installed"
+}
+
 # Create YADS directory structure
 create_yads_structure() {
     info "📁 Creating YADS directory structure..."
@@ -479,7 +511,19 @@ create_yads_structure() {
         cp -r "$script_dir/modules"/* "$yads_dir/modules/"
         chmod +x "$yads_dir/modules"/*.sh
     else
-        error_exit "Modules directory not found at $script_dir/modules"
+        # Try alternative paths when running with sudo
+        local alt_script_dir=""
+        if [[ -n "${SUDO_USER:-}" ]]; then
+            # Running with sudo, try user's home directory
+            alt_script_dir="/home/$SUDO_USER/yads"
+        fi
+        
+        if [[ -d "$alt_script_dir/modules" ]]; then
+            cp -r "$alt_script_dir/modules"/* "$yads_dir/modules/"
+            chmod +x "$yads_dir/modules"/*.sh
+        else
+            error_exit "Modules directory not found. Please run from the YADS repository directory."
+        fi
     fi
     
     # Create main yads script
@@ -557,6 +601,7 @@ main() {
     install_webservers
     install_databases
     install_gh_cli
+    install_cursor_cli
     create_yads_structure
     configure_firewall
     

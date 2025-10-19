@@ -128,6 +128,7 @@ show_status() {
     log "${WHITE}Core Services:${NC}"
     show_service_status "vscode-server" "VS Code Server"
     show_service_status "cloudflared" "Cloudflared Tunnel"
+    show_cursor_cli_status
     echo
     
     # Web servers
@@ -181,6 +182,15 @@ show_service_status() {
         fi
     else
         info "$display_name: Not installed"
+    fi
+}
+
+# Show Cursor CLI status
+show_cursor_cli_status() {
+    if command -v cursor-agent >/dev/null 2>&1; then
+        success "Cursor CLI: Installed"
+    else
+        info "Cursor CLI: Not installed"
     fi
 }
 

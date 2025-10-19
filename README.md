@@ -12,6 +12,7 @@ A remote PHP web development server with Cloudflared tunnels for internet access
 - **Project Management**: Easy project creation and management
 - **Wildcard Domains**: `project.remote.domain.tld` routing
 - **Composer & Laravel**: Pre-installed and configured
+- **Cursor CLI**: AI-powered command-line assistance
 
 ## Quick Start
 
