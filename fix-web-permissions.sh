@@ -123,7 +123,7 @@ done
 
 # Create a test project to verify permissions
 info "🧪 Creating test project to verify permissions..."
-local test_project="/var/www/projects/test-permissions"
+test_project="/var/www/projects/test-permissions"
 mkdir -p "$test_project"
 chown "$dev_user:webdev" "$test_project"
 chmod 775 "$test_project"
