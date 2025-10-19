@@ -325,6 +325,20 @@ install_vscode_server() {
     # Create systemd service following official approach
     # The official install script creates a user service, but we need a system service
     # So we'll create our own systemd service file
+    # Create a wrapper script for VS Code Server with proper Node.js environment
+    cat > /usr/local/bin/vscode-server-wrapper << 'EOF'
+#!/bin/bash
+# VS Code Server wrapper script with proper Node.js environment
+
+export NVM_DIR="/opt/vscode-server/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+# Start VS Code Server with proper environment
+exec /usr/local/bin/code-server "$@"
+EOF
+    
+    chmod +x /usr/local/bin/vscode-server-wrapper
+    
     cat > /etc/systemd/system/vscode-server.service << EOF
 [Unit]
 Description=VS Code Server
@@ -334,7 +348,7 @@ After=network.target
 Type=simple
 User=$vscode_user
 WorkingDirectory=$vscode_dir
-ExecStart=/usr/local/bin/code-server --bind-addr 0.0.0.0:8080 --auth password
+ExecStart=/usr/local/bin/vscode-server-wrapper --bind-addr 0.0.0.0:8080 --auth password
 Restart=always
 RestartSec=10
 Environment=PASSWORD_FILE=$vscode_dir/.password

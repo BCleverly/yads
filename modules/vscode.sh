@@ -131,15 +131,27 @@ EOF
         sudo chmod 600 "$vscode_dir/.config/code-server/config.yaml"
     fi
     
-    # Install useful extensions
+    # Install useful extensions with proper Node.js environment
     info "Installing VS Code extensions..."
-    sudo -u "$vscode_user" code-server --install-extension ms-vscode.vscode-json
-    sudo -u "$vscode_user" code-server --install-extension bradlc.vscode-tailwindcss
-    sudo -u "$vscode_user" code-server --install-extension ms-vscode.vscode-typescript-next
-    sudo -u "$vscode_user" code-server --install-extension ms-vscode.vscode-php-debug
-    sudo -u "$vscode_user" code-server --install-extension bmewburn.vscode-intelephense-client
-    sudo -u "$vscode_user" code-server --install-extension ms-vscode.vscode-github-pullrequest
-    sudo -u "$vscode_user" code-server --install-extension eamodio.gitlens
+    
+    # Ensure Node.js is available for vscode user
+    local vscode_node_path
+    vscode_node_path=$(sudo -u "$vscode_user" bash -c 'export NVM_DIR="/opt/vscode-server/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"; which node' 2>/dev/null || echo "")
+    
+    if [[ -n "$vscode_node_path" ]]; then
+        # Set up environment for vscode user
+        sudo -u "$vscode_user" bash -c "
+            export NVM_DIR='/opt/vscode-server/.nvm'
+            [ -s \"\$NVM_DIR/nvm.sh\" ] && \. \"\$NVM_DIR/nvm.sh\"
+            code-server --install-extension ms-vscode.vscode-json
+            code-server --install-extension bradlc.vscode-tailwindcss
+            code-server --install-extension ms-vscode.vscode-typescript-next
+            code-server --install-extension ms-vscode.vscode-php-debug
+        "
+    else
+        warning "Node.js not found for vscode user, skipping extension installation"
+        warning "VS Code Server will work but extensions may not install properly"
+    fi
     
     # Restart VS Code Server
     info "🔄 Restarting VS Code Server..."
