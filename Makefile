@@ -1,226 +1,124 @@
 # YADS Makefile
-# Provides easy commands for development and testing
+# Development and testing utilities
 
-.PHONY: help install test test-all test-ubuntu test-debian test-integration test-security test-performance clean install-bats
+.PHONY: help install test clean lint format
 
 # Default target
 help:
 	@echo "YADS - Yet Another Development Server"
+	@echo "====================================="
 	@echo ""
 	@echo "Available targets:"
-	@echo "  install          Install YADS"
-	@echo "  test             Run all tests"
-	@echo "  test-all         Run all tests with reports"
-	@echo "  test-ubuntu      Run Ubuntu-specific tests"
-	@echo "  test-debian      Run Debian-specific tests"
-	@echo "  test-integration Run integration tests"
-	@echo "  test-security    Run security tests"
-	@echo "  test-performance Run performance tests"
-	@echo "  install-bats     Install Bats testing framework"
-	@echo "  clean            Clean up test artifacts"
-	@echo "  lint             Run linting checks"
-	@echo "  format           Format code"
-	@echo "  docs             Generate documentation"
+	@echo "  install     - Install YADS locally"
+	@echo "  test        - Run all tests"
+	@echo "  test-unit   - Run unit tests"
+	@echo "  test-integration - Run integration tests"
+	@echo "  clean       - Clean up test artifacts"
+	@echo "  lint        - Run shellcheck on scripts"
+	@echo "  format      - Format shell scripts"
+	@echo "  help        - Show this help message"
+	@echo ""
 
-# Install YADS
+# Install YADS locally
 install:
-	@echo "Installing YADS..."
-	@chmod +x yads
-	@chmod +x modules/*.sh
-	@chmod +x install.sh
-	@echo "YADS installed successfully!"
-
-# Install Bats testing framework
-install-bats:
-	@echo "Installing Bats testing framework..."
-	@if command -v npm >/dev/null 2>&1; then \
-		npm install -g bats; \
-	elif command -v brew >/dev/null 2>&1; then \
-		brew install bats-core; \
-	elif command -v apt-get >/dev/null 2>&1; then \
-		sudo apt-get update && sudo apt-get install -y bats; \
-	elif command -v yum >/dev/null 2>&1; then \
-		sudo yum install -y bats; \
-	elif command -v dnf >/dev/null 2>&1; then \
-		sudo dnf install -y bats; \
-	elif command -v pacman >/dev/null 2>&1; then \
-		sudo pacman -S --noconfirm bats-core; \
-	else \
-		echo "Could not install Bats automatically. Please install it manually."; \
-		echo "Visit: https://github.com/bats-core/bats-core"; \
-		exit 1; \
-	fi
-	@echo "Bats installed successfully!"
+	@echo "Installing YADS locally..."
+	chmod +x yads install.sh manual-uninstall.sh
+	chmod +x modules/*.sh
+	@echo "✅ YADS installed locally"
 
 # Run all tests
-test: install-bats
-	@echo "Running all YADS tests..."
-	@cd tests && ./run-tests.sh --all
+test: test-unit test-integration
+	@echo "✅ All tests completed"
 
-# Run all tests with detailed reports
-test-all: install-bats
-	@echo "Running all YADS tests with detailed reports..."
-	@cd tests && ./run-tests.sh --all --verbose
-
-# Run Ubuntu-specific tests
-test-ubuntu: install-bats
-	@echo "Running Ubuntu-specific tests..."
-	@cd tests && ./run-tests.sh debian-ubuntu.bats
-
-# Run Debian-specific tests
-test-debian: install-bats
-	@echo "Running Debian-specific tests..."
-	@cd tests && ./run-tests.sh debian-ubuntu.bats
-
-# Run integration tests
-test-integration: install-bats
-	@echo "Running integration tests..."
-	@cd tests && ./run-tests.sh yads.bats install.bats
-
-# Run security tests
-test-security:
-	@echo "Running security tests..."
-	@if command -v shellcheck >/dev/null 2>&1; then \
-		shellcheck yads modules/*.sh tests/*.sh install.sh; \
+# Run unit tests
+test-unit:
+	@echo "Running unit tests..."
+	@if command -v bats >/dev/null 2>&1; then \
+		bats tests/unit/; \
 	else \
-		echo "ShellCheck not installed. Installing..."; \
-		sudo apt-get update && sudo apt-get install -y shellcheck; \
-		shellcheck yads modules/*.sh tests/*.sh install.sh; \
+		echo "⚠️  Bats not installed, skipping unit tests"; \
 	fi
 
-# Run performance tests
-test-performance: install-bats
-	@echo "Running performance tests..."
-	@cd tests && ./run-tests.sh --all
-	@echo "Performance test completed!"
+# Run integration tests
+test-integration:
+	@echo "Running integration tests..."
+	@if command -v bats >/dev/null 2>&1; then \
+		bats tests/integration/; \
+	else \
+		echo "⚠️  Bats not installed, skipping integration tests"; \
+	fi
 
 # Clean up test artifacts
 clean:
 	@echo "Cleaning up test artifacts..."
-	@rm -rf tests/reports/*
-	@rm -rf /tmp/yads-test-*
-	@rm -rf ~/.yads.backup.*
-	@echo "Cleanup completed!"
+	rm -rf /tmp/yads-test-*
+	rm -rf /tmp/yads-backup-*
+	@echo "✅ Cleanup completed"
 
-# Run linting checks
+# Run shellcheck on scripts
 lint:
-	@echo "Running linting checks..."
+	@echo "Running shellcheck..."
 	@if command -v shellcheck >/dev/null 2>&1; then \
-		shellcheck yads modules/*.sh tests/*.sh install.sh; \
+		shellcheck yads install.sh manual-uninstall.sh; \
+		shellcheck modules/*.sh; \
+		echo "✅ Shellcheck completed"; \
 	else \
-		echo "ShellCheck not installed. Installing..."; \
-		sudo apt-get update && sudo apt-get install -y shellcheck; \
-		shellcheck yads modules/*.sh tests/*.sh install.sh; \
+		echo "⚠️  Shellcheck not installed, skipping linting"; \
 	fi
-	@echo "Linting completed!"
 
-# Format code
+# Format shell scripts
 format:
-	@echo "Formatting code..."
+	@echo "Formatting shell scripts..."
 	@if command -v shfmt >/dev/null 2>&1; then \
-		shfmt -i 4 -w yads modules/*.sh tests/*.sh install.sh; \
+		shfmt -w -i 4 -ci yads install.sh manual-uninstall.sh; \
+		shfmt -w -i 4 -ci modules/*.sh; \
+		echo "✅ Formatting completed"; \
 	else \
-		echo "shfmt not installed. Installing..."; \
-		go install mvdan.cc/sh/v3/cmd/shfmt@latest; \
-		shfmt -i 4 -w yads modules/*.sh tests/*.sh install.sh; \
+		echo "⚠️  shfmt not installed, skipping formatting"; \
 	fi
-	@echo "Code formatting completed!"
 
-# Generate documentation
-docs:
-	@echo "Generating documentation..."
-	@if command -v pandoc >/dev/null 2>&1; then \
-		pandoc README.md -o README.html; \
+# Install development dependencies
+dev-deps:
+	@echo "Installing development dependencies..."
+	@if command -v apt-get >/dev/null 2>&1; then \
+		sudo apt-get update && sudo apt-get install -y bats shellcheck shfmt; \
+	elif command -v dnf >/dev/null 2>&1; then \
+		sudo dnf install -y bats ShellCheck shfmt; \
+	elif command -v yum >/dev/null 2>&1; then \
+		sudo yum install -y bats ShellCheck; \
+	elif command -v pacman >/dev/null 2>&1; then \
+		sudo pacman -S --noconfirm bats shellcheck shfmt; \
 	else \
-		echo "Pandoc not installed. Installing..."; \
-		sudo apt-get update && sudo apt-get install -y pandoc; \
-		pandoc README.md -o README.html; \
+		echo "⚠️  Package manager not supported for dev dependencies"; \
 	fi
-	@echo "Documentation generated!"
 
-# Development setup
-dev-setup: install-bats
-	@echo "Setting up development environment..."
-	@chmod +x yads modules/*.sh tests/*.sh install.sh
-	@mkdir -p tests/reports
-	@echo "Development environment ready!"
+# Create test environment
+test-env:
+	@echo "Creating test environment..."
+	@mkdir -p tests/unit tests/integration
+	@echo "✅ Test environment created"
 
-# Quick test (fastest)
-quick-test: install-bats
-	@echo "Running quick tests..."
-	@cd tests && ./run-tests.sh yads.bats
+# Run specific test file
+test-file:
+	@if [ -z "$(FILE)" ]; then \
+		echo "Usage: make test-file FILE=tests/unit/test.bats"; \
+		exit 1; \
+	fi
+	@if command -v bats >/dev/null 2>&1; then \
+		bats "$(FILE)"; \
+	else \
+		echo "⚠️  Bats not installed"; \
+	fi
 
-# Full test suite
-full-test: install-bats
-	@echo "Running full test suite..."
-	@cd tests && ./run-tests.sh --all --coverage
+# Show version
+version:
+	@echo "YADS version: $$(cat version)"
 
-# Test specific functionality
-test-help:
-	@echo "Testing help functionality..."
-	@./yads help
-	@./yads --help
-
-test-status:
-	@echo "Testing status functionality..."
-	@./yads status
-
-test-create:
-	@echo "Testing project creation..."
-	@./yads create test-project || true
-
-# CI/CD helpers
-ci-test: install-bats
-	@echo "Running CI tests..."
-	@cd tests && ./run-tests.sh --all
-	@echo "CI tests completed!"
-
-ci-security:
-	@echo "Running CI security tests..."
-	@shellcheck yads modules/*.sh tests/*.sh install.sh
-	@echo "CI security tests completed!"
-
-ci-performance:
-	@echo "Running CI performance tests..."
-	@time ./yads help
-	@time ./yads status
-	@echo "CI performance tests completed!"
-
-# Docker testing
-docker-test:
-	@echo "Running tests in Docker..."
-	@docker run --rm -v "$(pwd):/yads" -w /yads ubuntu:22.04 bash -c "apt-get update && apt-get install -y bats && cd tests && ./run-tests.sh --all"
-
-# Show test results
-show-results:
-	@echo "Showing latest test results..."
-	@cd tests && ./run-tests.sh --report
-
-# List available tests
-list-tests:
-	@echo "Available test files:"
-	@cd tests && ./run-tests.sh --list
-
-# Run tests with verbose output
-verbose-test: install-bats
-	@echo "Running tests with verbose output..."
-	@cd tests && ./run-tests.sh --all --verbose
-
-# Test coverage
-coverage: install-bats
-	@echo "Running tests with coverage..."
-	@cd tests && ./run-tests.sh --coverage
-
-# Benchmark tests
-benchmark: install-bats
-	@echo "Running benchmark tests..."
-	@cd tests && ./run-tests.sh --all
-	@echo "Benchmark completed!"
-
-# All-in-one test
-all: install test-all test-security test-performance
-	@echo "All tests completed!"
-
-# Default target
-.DEFAULT_GOAL := help
-
+# Show system info
+info:
+	@echo "System Information:"
+	@echo "OS: $$(uname -s)"
+	@echo "Architecture: $$(uname -m)"
+	@echo "Shell: $$(basename $$SHELL)"
+	@echo "User: $$(whoami)"
+	@echo "Home: $$HOME"

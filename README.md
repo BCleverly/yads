@@ -1,242 +1,269 @@
 # YADS - Yet Another Development Server
 
-A comprehensive bash script for setting up a PHP development server with remote access capabilities using Cloudflare tunnels and VS Code Server.
+A remote PHP web development server with Cloudflared tunnels for internet accessibility.
 
 ## Features
 
-- **PHP 8.4** with easy version management
-- **Database Support**: MySQL and PostgreSQL
-- **Web Server Choice**: NGINX or FrankenPHP
-- **SSL Certificates**: Automatic Let's Encrypt wildcard certificates
-- **Remote Access**: Cloudflare tunnel integration
-- **Development Tools**: GitHub CLI, Cursor AI CLI, Composer, Laravel
+- **Remote Development**: VS Code Server accessible via authentication
+- **Cloudflared Tunnels**: Secure internet access without port forwarding
+- **Multiple PHP Versions**: Support for PHP 5.6 through 8.5
+- **Web Server Choice**: Apache, Nginx, or FrankenPHP
+- **Database Support**: MySQL, PostgreSQL, and Redis
 - **Project Management**: Easy project creation and management
-- **User Permissions**: Proper group/permission setup for development
-- **Wildcard Domains**: Support for multiple projects on subdomains
+- **Wildcard Domains**: `project.remote.domain.tld` routing
+- **Composer & Laravel**: Pre-installed and configured
 
 ## Quick Start
 
-1. **Download and install YADS:**
-   ```bash
-   # Option 1: Direct installation (requires public repository)
-   curl -fsSL https://raw.githubusercontent.com/BCleverly/yads/master/install.sh | bash
-   
-   # Option 2: Clone and install (works with private repositories)
-   git clone https://github.com/BCleverly/yads.git
-   cd yads
-   chmod +x install.sh
-   ./install.sh
-   
-   # Note: If you clone the repository, the installer will automatically
-   # detect the Git repository and copy files locally instead of downloading
-   ```
+### Installation
 
-2. **Install the development server:**
-   ```bash
-   yads install
-   ```
+```bash
+# Download and install YADS
+curl -fsSL https://raw.githubusercontent.com/your-repo/yads/main/install.sh | bash
 
-3. **Configure your domain:**
-   ```bash
-   yads domains
-   ```
+# Or clone and install manually
+git clone https://github.com/your-repo/yads.git
+cd yads
+sudo ./install.sh
+```
 
-4. **Create your first project:**
-   ```bash
-   yads create my-laravel-app
-   ```
+### Basic Usage
+
+```bash
+# Check status
+yads status
+
+# Configure Cloudflared tunnel
+yads tunnel setup
+
+# Create a new project
+yads project myapp laravel
+
+# Install specific PHP version
+yads php 8.2
+
+# Switch web server
+yads server nginx
+```
 
 ## Commands
 
-### `yads install`
-Installs all required software and configures the development server.
+### Core Commands
 
-**What gets installed:**
-- PHP 8.4 with extensions (MySQL, PostgreSQL, Redis, Memcached, Xdebug)
-- MySQL and PostgreSQL databases
-- Composer and Laravel installer
-- GitHub CLI and Cursor AI CLI
-- Cloudflare tunnel
-- Your choice of web server (NGINX or FrankenPHP)
+- `yads install` - Install YADS development server
+- `yads uninstall` - Uninstall YADS (preserves SSH keys)
+- `yads status` - Show service status
+- `yads start` - Start all services
+- `yads stop` - Stop all services
+- `yads restart` - Restart all services
 
-### `yads domains`
-Configures domain settings and SSL certificates.
+### PHP Management
 
-**Features:**
-- Wildcard domain setup (e.g., `*.yourdomain.com`)
-- Automatic SSL certificate generation with Let's Encrypt
-- Cloudflare tunnel configuration
-- DNS record management
+- `yads php <version>` - Install specific PHP version (5.6-8.5)
+- `yads php composer` - Install Composer and Laravel installer
+- `yads php list` - List available PHP versions
 
-### `yads create <project-name>`
-Creates a new PHP project with proper configuration.
+### Web Servers
 
-**Supported project types:**
-- Laravel (recommended)
-- Symfony
-- CodeIgniter
-- Custom PHP
-- WordPress
+- `yads server apache` - Switch to Apache
+- `yads server nginx` - Switch to Nginx
+- `yads server frankenphp` - Switch to FrankenPHP
+- `yads server status` - Show web server status
 
-**What gets created:**
-- Project directory with proper permissions
-- Database setup (MySQL and PostgreSQL)
-- Domain configuration
-- Git repository initialization
-- Development scripts
+### Databases
 
-### `yads status`
-Shows the current installation status of all components.
+- `yads database mysql` - Install MySQL
+- `yads database postgresql` - Install PostgreSQL
+- `yads database redis` - Install Redis
+- `yads database create <project> <mysql|postgresql>` - Create project database
 
-### `yads update`
-Updates all installed software to the latest versions.
+### Cloudflared Tunnels
 
-### `yads uninstall`
-Removes all YADS components and configurations.
+- `yads tunnel setup` - Configure Cloudflared tunnel
+- `yads tunnel start` - Start tunnel
+- `yads tunnel stop` - Stop tunnel
+- `yads tunnel restart` - Restart tunnel
+- `yads tunnel status` - Show tunnel status
+
+### VS Code Server
+
+- `yads vscode setup` - Configure VS Code Server
+- `yads vscode start` - Start VS Code Server
+- `yads vscode stop` - Stop VS Code Server
+- `yads vscode password` - Change password
+- `yads vscode install <extension>` - Install extension
+
+### Project Management
+
+- `yads project <name>` - Create new PHP project
+- `yads project <name> laravel` - Create Laravel project
+- `yads project <name> symfony` - Create Symfony project
+- `yads project <name> wordpress` - Create WordPress project
+- `yads project list` - List all projects
+- `yads project delete <name>` - Delete project
+
+## Architecture
+
+### Directory Structure
+
+```
+/opt/yads/                 # YADS installation directory
+├── modules/               # YADS modules
+├── config/               # Configuration files
+└── logs/                 # Log files
+
+/var/www/projects/         # Project directory
+├── project1/             # Individual projects
+├── project2/
+└── ...
+
+/opt/vscode-server/        # VS Code Server
+├── .config/
+└── .password
+```
+
+### Service Architecture
+
+- **VS Code Server**: Port 8080 (authenticated access)
+- **Web Server**: Port 80 (Apache/Nginx/FrankenPHP)
+- **Cloudflared**: Secure tunnel to internet
+- **Databases**: MySQL, PostgreSQL, Redis
+
+### Domain Routing
+
+- `code.remote.domain.tld` → VS Code Server
+- `*.remote.domain.tld` → Project routing
+- `project1.remote.domain.tld` → `/var/www/projects/project1`
+- `project2.remote.domain.tld` → `/var/www/projects/project2`
 
 ## Configuration
 
-YADS stores its configuration in `~/.yads/config`. You can edit this file to modify settings:
+### VS Code Server
+
+Access: `http://localhost:8080` or `https://code.remote.domain.tld`
+
+Default password is generated during installation and stored in `/opt/vscode-server/.password`
+
+### Cloudflared Tunnel
+
+1. Run `yads tunnel setup`
+2. Login to your Cloudflare account
+3. Configure your domain DNS
+4. Access your server via `https://code.remote.domain.tld`
+
+### Project Access
+
+Projects are accessible via:
+- `https://projectname.remote.domain.tld`
+- Local: `http://localhost/projectname`
+
+## Prerequisites
+
+- Ubuntu/Debian/CentOS/RHEL/Fedora/Arch Linux
+- Root or sudo access
+- Internet connection
+- Cloudflare account (for tunnels)
+
+## Uninstallation
+
+### Normal Uninstall
 
 ```bash
-WEB_SERVER="nginx"           # or "frankenphp"
-PHP_VERSION="8.4"
-DOMAIN="yourdomain.com"
-CLOUDFLARE_TOKEN="your-token"
-GITHUB_TOKEN="your-token"
+yads uninstall
 ```
 
-## Project Structure
+### Manual Uninstall
 
-After creating a project, you'll have:
+If normal uninstall fails:
 
-```
-/var/www/html/your-project/
-├── public/                 # Web root
-├── src/                   # Source code
-├── config/                # Configuration files
-├── tests/                 # Test files
-├── .yads/                 # YADS configuration
-├── dev.sh                 # Development scripts
-└── .gitignore            # Git ignore rules
+```bash
+sudo ./manual-uninstall.sh
 ```
 
-## Development Workflow
-
-1. **Create a project:**
-   ```bash
-   yads create my-app
-   ```
-
-2. **Access your project:**
-   - Local: `https://my-app.yourdomain.com`
-   - Remote: Access via Cloudflare tunnel
-
-3. **Development commands:**
-   ```bash
-   cd /var/www/html/my-app
-   ./dev.sh start    # Start development server
-   ./dev.sh build    # Build frontend assets
-   ./dev.sh test     # Run tests
-   ./dev.sh migrate  # Run database migrations
-   ```
-
-## Remote Development
-
-YADS is designed for remote development with VS Code Server:
-
-1. **Install VS Code Server:**
-   ```bash
-   curl -fsSL https://code-server.dev/install.sh | sh
-   ```
-
-2. **Start VS Code Server:**
-   ```bash
-   code-server --bind-addr 0.0.0.0:8080
-   ```
-
-3. **Access via Cloudflare tunnel:**
-   - Your VS Code Server will be accessible at `https://vscode.yourdomain.com`
-
-## SSL Certificates
-
-YADS automatically handles SSL certificates:
-
-- **Wildcard certificates** for all subdomains
-- **Automatic renewal** via cron job
-- **Security headers** configured
-- **HTTP to HTTPS redirect**
-
-## Database Management
-
-Each project gets its own databases:
-
-- **MySQL database**: `projectname_dev`
-- **PostgreSQL database**: `projectname_dev_pg`
-- **User**: `yads`
-- **Automatic password generation**
+**Note**: SSH keys and user data are preserved during uninstallation.
 
 ## Troubleshooting
 
-### Check installation status:
+### Services Not Starting
+
 ```bash
+# Check service status
 yads status
+
+# Restart services
+yads restart
+
+# Check logs
+journalctl -u vscode-server
+journalctl -u cloudflared
 ```
 
-### View logs:
+### VS Code Server Issues
+
 ```bash
-tail -f ~/.yads/yads.log
+# Change password
+yads vscode password
+
+# Restart VS Code Server
+yads vscode restart
+
+# Check configuration
+cat /opt/vscode-server/.config/code-server/config.yaml
 ```
 
-### Restart services:
+### Tunnel Issues
+
 ```bash
-sudo systemctl restart nginx    # or frankenphp
-sudo systemctl restart mysql
-sudo systemctl restart postgresql
-sudo systemctl restart cloudflared
+# Check tunnel status
+yads tunnel status
+
+# Restart tunnel
+yads tunnel restart
+
+# Check tunnel logs
+journalctl -u cloudflared
 ```
 
-### Reset permissions:
-```bash
-sudo chown -R www-data:www-data /var/www/html
-sudo chmod -R 755 /var/www/html
-```
+## Development
 
-## Requirements
+### Project Structure
 
-- **Operating System**: Ubuntu 20.04+, Debian 11+, CentOS 8+, RHEL 8+, Fedora 35+, Arch Linux
-- **Memory**: Minimum 2GB RAM (4GB recommended)
-- **Storage**: Minimum 10GB free space
-- **Network**: Internet connection for package downloads
-- **Domain**: A domain name for SSL certificates and remote access
+- `yads` - Main CLI script
+- `install.sh` - Installation script
+- `modules/` - Individual modules
+- `manual-uninstall.sh` - Manual uninstall script
 
-## Security Features
+### Adding New Modules
 
-- **User isolation**: Proper user/group permissions
-- **SSL/TLS encryption**: Automatic HTTPS
-- **Security headers**: HSTS, XSS protection, etc.
-- **Rate limiting**: API and login protection
-- **Firewall ready**: Configured for common ports
+1. Create new module in `modules/`
+2. Add command handling in main `yads` script
+3. Update help documentation
+
+## License
+
+MIT License - see LICENSE file for details.
 
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## License
-
-MIT License - see LICENSE file for details.
+4. Submit a pull request
 
 ## Support
 
-- **Issues**: GitHub Issues
-- **Documentation**: This README
-- **Community**: GitHub Discussions
+For issues and questions:
+- GitHub Issues: [Create an issue](https://github.com/your-repo/yads/issues)
+- Documentation: [Wiki](https://github.com/your-repo/yads/wiki)
 
----
+## Changelog
 
-**YADS** - Making PHP development server setup as easy as possible! 🚀
-
+### v1.0.0
+- Initial release
+- VS Code Server with authentication
+- Cloudflared tunnel support
+- Multiple PHP version support
+- Web server choice (Apache/Nginx/FrankenPHP)
+- Database support (MySQL/PostgreSQL/Redis)
+- Project management
+- Wildcard domain routing

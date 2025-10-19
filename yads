@@ -1,1055 +1,212 @@
 #!/bin/bash
 
 # YADS - Yet Another Development Server
-# A comprehensive PHP development server setup script
+# Remote PHP Web Development Server with Cloudflared Tunnels
 
 set -euo pipefail
 
-# Color detection and setup
+# Script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MODULES_DIR="${SCRIPT_DIR}/modules"
+
+# Color setup
 setup_colors() {
-    # Check if we should use colors
-    local use_colors=true
-    
-    # Check if NO_COLOR environment variable is set
-    if [[ -n "${NO_COLOR:-}" ]]; then
-        use_colors=false
+    if [[ -t 2 ]] && [[ -z "${NO_COLOR-}" ]] && [[ "${TERM-}" != "dumb" ]]; then
+        RED='\033[0;31m'
+        GREEN='\033[0;32m'
+        YELLOW='\033[1;33m'
+        BLUE='\033[0;34m'
+        CYAN='\033[0;36m'
+        NC='\033[0m' # No Color
+    else
+        RED=''
+        GREEN=''
+        YELLOW=''
+        BLUE=''
+        CYAN=''
+        NC=''
     fi
-    
-    # Check if terminal supports colors
-    if [[ "$use_colors" == "true" ]] && [[ -t 1 ]] && [[ "${TERM}" != "dumb" ]]; then
-        # Test if colors work by trying to output a color code
-        if command -v tput >/dev/null 2>&1 && tput colors >/dev/null 2>&1; then
-            local color_count=$(tput colors 2>/dev/null || echo "0")
-            if [[ "$color_count" -ge 8 ]]; then
-                # Terminal supports colors
-                RED='\033[0;31m'
-                GREEN='\033[0;32m'
-                YELLOW='\033[1;33m'
-                BLUE='\033[0;34m'
-                PURPLE='\033[0;35m'
-                CYAN='\033[0;36m'
-                NC='\033[0m' # No Color
-                return
-            fi
-        fi
-    fi
-    
-    # Terminal doesn't support colors or colors disabled
-    RED=''
-    GREEN=''
-    YELLOW=''
-    BLUE=''
-    PURPLE=''
-    CYAN=''
-    NC=''
 }
 
-# Initialize colors
-setup_colors
-
-# Configuration
-YADS_DIR="$HOME/.yads"
-CONFIG_FILE="$YADS_DIR/config"
-LOG_FILE="$YADS_DIR/yads.log"
-
-# Create YADS directory if it doesn't exist
-mkdir -p "$YADS_DIR"
-
-# Logging function
+# Logging functions
 log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_FILE"
-    echo -e "$1"
+    echo -e "$1" >&2
 }
 
-# Error handling
 error_exit() {
-    log "${RED}ERROR: $1${NC}"
+    log "${RED}❌ Error: $1${NC}"
     exit 1
 }
 
-# Success message
-success() {
-    log "${GREEN}✓ $1${NC}"
-}
-
-# Warning message
 warning() {
-    log "${YELLOW}⚠ $1${NC}"
+    log "${YELLOW}⚠️  Warning: $1${NC}"
 }
 
-# Info message
 info() {
-    log "${BLUE}ℹ $1${NC}"
+    log "${BLUE}ℹ️  $1${NC}"
 }
 
-# Check if running as root
-check_root() {
-    if [[ $EUID -eq 0 ]]; then
-        error_exit "This script should not be run as root. Please run as a regular user with sudo privileges."
-    fi
+success() {
+    log "${GREEN}✅ $1${NC}"
 }
 
-# Check if sudo is available
-check_sudo() {
-    if ! command -v sudo &> /dev/null; then
-        error_exit "sudo is required but not installed. Please install sudo first."
-    fi
-}
-
-# Detect OS
-detect_os() {
-    if [[ -f /etc/os-release ]]; then
-        . /etc/os-release
-        OS=$ID
-        OS_VERSION=$VERSION_ID
-    elif type lsb_release >/dev/null 2>&1; then
-        OS=$(lsb_release -si | tr '[:upper:]' '[:lower:]')
-        OS_VERSION=$(lsb_release -sr)
-    else
-        error_exit "Cannot detect operating system"
+# Version detection
+get_version() {
+    # Try Git tags first (preferred)
+    if command -v git >/dev/null 2>&1 && [[ -d "${SCRIPT_DIR}/.git" ]]; then
+        local git_tag
+        git_tag=$(git -C "${SCRIPT_DIR}" describe --tags --exact-match 2>/dev/null || true)
+        if [[ -n "${git_tag}" ]]; then
+            echo "${git_tag#v}"  # Remove 'v' prefix
+            return
+        fi
     fi
     
-    log "${CYAN}Detected OS: $OS $OS_VERSION${NC}"
+    # Fallback to version file
+    if [[ -f "${SCRIPT_DIR}/version" ]]; then
+        cat "${SCRIPT_DIR}/version"
+        return
+    fi
+    
+    # Fallback to script content
+    local version_line
+    version_line=$(grep -E '^# Version:' "${SCRIPT_DIR}/yads" 2>/dev/null | head -1 || true)
+    if [[ -n "${version_line}" ]]; then
+        echo "${version_line#*: }"
+        return
+    fi
+    
+    # Default version
+    echo "1.0.0"
 }
 
-# Load configuration
-load_config() {
-    if [[ -f "$CONFIG_FILE" ]]; then
-        source "$CONFIG_FILE"
-    else
-        # Default configuration
-        WEB_SERVER="nginx"
-        PHP_VERSION="8.4"
-        DOMAIN=""
-        CLOUDFLARE_TOKEN=""
-        GITHUB_TOKEN=""
+# Check if module exists and is readable
+check_module() {
+    local module="$1"
+    if [[ ! -f "${MODULES_DIR}/${module}.sh" ]]; then
+        error_exit "Module '${module}' not found at ${MODULES_DIR}/${module}.sh"
+    fi
+    if [[ ! -r "${MODULES_DIR}/${module}.sh" ]]; then
+        error_exit "Module '${module}' is not readable"
     fi
 }
 
-# Save configuration
-save_config() {
-    cat > "$CONFIG_FILE" << EOF
-WEB_SERVER="$WEB_SERVER"
-PHP_VERSION="$PHP_VERSION"
-DOMAIN="$DOMAIN"
-CLOUDFLARE_TOKEN="$CLOUDFLARE_TOKEN"
-GITHUB_TOKEN="$GITHUB_TOKEN"
-EOF
+# Source module with error handling
+source_module() {
+    local module="$1"
+    check_module "$module"
+    source "${MODULES_DIR}/${module}.sh"
 }
 
 # Show help
 show_help() {
-    echo -e "${CYAN}YADS - Yet Another Development Server${NC}"
-    echo
-    echo -e "${GREEN}Usage:${NC}"
-    echo "    yads <command> [options]"
-    echo
-    echo -e "${GREEN}Commands:${NC}"
-    echo -e "    ${YELLOW}install${NC}           Install all required software and configure the development server"
-    echo -e "    ${YELLOW}domains${NC}           Configure domain settings and SSL certificates"
-    echo -e "    ${YELLOW}create <project> [repo]${NC}  Create a new PHP project with optional Git repository"
-    echo -e "    ${YELLOW}status${NC}            Show current installation status"
-    echo -e "    ${YELLOW}prerequisites${NC}     Check system prerequisites before installation"
-    echo -e "    ${YELLOW}check${NC}             Verify YADS global availability"
-    echo -e "    ${YELLOW}code-server${NC}       Set up VS Code Server for remote development"
-    echo -e "    ${YELLOW}projects${NC}           Set up project browser for codebase access"
-    echo -e "    ${YELLOW}ssh${NC}               Set up SSH keys for Git integration"
-    echo -e "    ${YELLOW}update${NC}            Update installed software"
-    echo -e "    ${YELLOW}upgrade${NC}           Upgrade YADS to latest version"
-    echo -e "    ${YELLOW}version${NC}           Show YADS version information"
-    echo -e "    ${YELLOW}uninstall${NC}         Remove all YADS components"
-    echo -e "    ${YELLOW}help${NC}              Show this help message"
-    echo
-    echo -e "${GREEN}Examples:${NC}"
-    echo "    yads install"
-    echo "    yads domains"
-    echo "    yads create my-laravel-app"
-    echo "    yads create erp https://github.com/user/erp-system.git"
-    echo "    yads create blog user/blog-repo"
-    echo "    yads domains"
-    echo "    yads code-server"
-    echo "    yads projects"
-    echo "    yads ssh"
-    echo "    yads upgrade"
-    echo "    yads version"
-    echo "    yads status"
-    echo
-    echo -e "${GREEN}Prerequisites for Installation:${NC}"
-    echo -e "    ${YELLOW}System Requirements:${NC}"
-    echo "    • Operating System: Ubuntu 20.04+, Debian 11+, CentOS 8+, RHEL 8+, Fedora 35+, Arch Linux"
-    echo "    • Memory: Minimum 2GB RAM (4GB recommended)"
-    echo "    • Storage: Minimum 10GB free space"
-    echo "    • Network: Internet connection for package downloads"
-    echo "    • Domain: A domain name for SSL certificates and remote access"
-    echo
-    echo -e "    ${YELLOW}Required Commands:${NC}"
-    echo "    • curl, wget, tar, gzip, openssl"
-    echo "    • sudo access (for package installation)"
-    echo "    • Git (for project management)"
-    echo
-    echo -e "    ${YELLOW}What Gets Installed:${NC}"
-    echo "    • PHP 8.4 with extensions (MySQL, PostgreSQL, Redis, Memcached, Xdebug)"
-    echo "    • MySQL and PostgreSQL databases"
-    echo "    • NGINX or FrankenPHP web server (your choice)"
-    echo "    • Composer and Laravel installer"
-    echo "    • GitHub CLI and Cursor AI CLI"
-    echo "    • Cloudflare tunnel for remote access"
-    echo "    • SSL certificates with Let's Encrypt"
-    echo
-    echo -e "    ${YELLOW}Installation Time:${NC}"
-    echo "    • Fast connection: 5-10 minutes"
-    echo "    • Slow connection: 15-30 minutes"
-    echo "    • Total download size: ~500MB"
-    echo
-    echo -e "${GREEN}Configuration:${NC}"
-    echo "    Config file: $CONFIG_FILE"
-    echo "    Log file: $LOG_FILE"
-}
+    cat << EOF
+${CYAN}YADS - Yet Another Development Server${NC}
+${BLUE}Remote PHP Web Development Server with Cloudflared Tunnels${NC}
 
-# Show installation status
-show_status() {
-    log "${CYAN}YADS Installation Status${NC}"
-    echo
-    
-    # Check PHP
-    if command -v php &> /dev/null; then
-        PHP_VER=$(php -v | head -n1 | cut -d' ' -f2)
-        success "PHP $PHP_VER is installed"
-    else
-        warning "PHP is not installed"
-    fi
-    
-    # Check MySQL
-    if command -v mysql &> /dev/null; then
-        success "MySQL is installed"
-    else
-        warning "MySQL is not installed"
-    fi
-    
-    # Check PostgreSQL
-    if command -v psql &> /dev/null; then
-        success "PostgreSQL is installed"
-    else
-        warning "PostgreSQL is not installed"
-    fi
-    
-    # Check Cloudflare tunnel
-    if command -v cloudflared &> /dev/null; then
-        success "Cloudflare tunnel is installed"
-    else
-        warning "Cloudflare tunnel is not installed"
-    fi
-    
-    # Check GitHub CLI
-    if command -v gh &> /dev/null; then
-        success "GitHub CLI is installed"
-    else
-        warning "GitHub CLI is not installed"
-    fi
-    
-    # Check Cursor CLI
-    if command -v cursor &> /dev/null; then
-        success "Cursor CLI is installed"
-    else
-        warning "Cursor CLI is not installed"
-    fi
-    
-    # Check Composer
-    if command -v composer &> /dev/null; then
-        success "Composer is installed"
-    else
-        warning "Composer is not installed"
-    fi
-    
-    # Check web server
-    if command -v nginx &> /dev/null; then
-        success "NGINX is installed"
-    elif command -v frankenphp &> /dev/null; then
-        success "FrankenPHP is installed"
-    else
-        warning "No web server is installed"
-    fi
-}
+${YELLOW}Usage:${NC}
+  yads <command> [options]
 
-# Check if YADS is globally available
-check_global_availability() {
-    if command -v yads &> /dev/null; then
-        success "YADS is globally available"
-        info "You can use 'yads' from anywhere in your system"
-    else
-        warning "YADS is not globally available"
-        info "You may need to restart your terminal or run 'source ~/.bashrc'"
-    fi
-}
+${YELLOW}Commands:${NC}
+  install                 Install YADS development server
+  uninstall               Uninstall YADS (preserves SSH keys)
+  start                   Start all services
+  stop                    Stop all services
+  restart                 Restart all services
+  status                  Show service status
+  php <version>           Install specific PHP version (5.6-8.5)
+  server <type>           Switch web server (apache|nginx|frankenphp)
+  database <type>         Install database (mysql|postgresql)
+  tunnel                  Configure Cloudflared tunnel
+  vscode                  Configure VS Code Server
+  project <name>          Create new project
+  help                    Show this help message
+  version                 Show version information
 
-# Show prerequisites information
-show_prerequisites() {
-    log "${CYAN}YADS Installation Prerequisites${NC}"
-    echo
-    
-    log "${YELLOW}System Requirements:${NC}"
-    echo "  • Operating System: Ubuntu 20.04+, Debian 11+, CentOS 8+, RHEL 8+, Fedora 35+, Arch Linux"
-    echo "  • Memory: Minimum 2GB RAM (4GB recommended)"
-    echo "  • Storage: Minimum 10GB free space"
-    echo "  • Network: Internet connection for package downloads"
-    echo "  • Domain: A domain name for SSL certificates and remote access"
-    echo
-    
-    log "${YELLOW}Required Commands:${NC}"
-    local required_commands=("curl" "wget" "tar" "gzip" "openssl" "git")
-    for cmd in "${required_commands[@]}"; do
-        if command -v "$cmd" &> /dev/null; then
-            success "$cmd is available"
-        else
-            warning "$cmd is missing"
-        fi
-    done
-    echo
-    
-    log "${YELLOW}System Checks:${NC}"
-    
-    # Check if running as root
-    if [[ $EUID -eq 0 ]]; then
-        warning "Running as root - this is not recommended"
-    else
-        success "Running as regular user"
-    fi
-    
-    # Check sudo access
-    if sudo -n true 2>/dev/null; then
-        success "Sudo access available"
-    else
-        warning "Sudo access required - you may be prompted for password"
-    fi
-    
-    # Check internet connectivity
-    if ping -c 1 google.com &> /dev/null; then
-        success "Internet connectivity available"
-    else
-        warning "Internet connectivity issues detected"
-    fi
-    
-    # Check available disk space
-    local available_space=$(df / | awk 'NR==2 {print $4}')
-    if [[ $available_space -gt 2097152 ]]; then  # 2GB in KB
-        success "Sufficient disk space available ($(($available_space / 1024 / 1024))GB free)"
-    else
-        warning "Low disk space detected ($(($available_space / 1024 / 1024))GB free)"
-    fi
-    
-    # Check memory
-    local total_memory=$(free -m | awk 'NR==2{print $2}')
-    if [[ $total_memory -gt 1024 ]]; then
-        success "Sufficient memory available (${total_memory}MB total)"
-    else
-        warning "Low memory detected (${total_memory}MB total)"
-    fi
-    
-    echo
-    log "${YELLOW}What Gets Installed:${NC}"
-    echo "  • PHP 8.4 with extensions (MySQL, PostgreSQL, Redis, Memcached, Xdebug)"
-    echo "  • MySQL and PostgreSQL databases"
-    echo "  • NGINX or FrankenPHP web server (your choice)"
-    echo "  • Composer and Laravel installer"
-    echo "  • GitHub CLI and Cursor AI CLI"
-    echo "  • Cloudflare tunnel for remote access"
-    echo "  • SSL certificates with Let's Encrypt"
-    echo
-    
-    log "${YELLOW}Installation Time:${NC}"
-    echo "  • Fast connection: 5-10 minutes"
-    echo "  • Slow connection: 15-30 minutes"
-    echo "  • Total download size: ~500MB"
-    echo
-    
-    log "${BLUE}Ready to install? Run: yads install${NC}"
-}
+${YELLOW}Examples:${NC}
+  yads install                    # Install complete development server
+  yads php 8.2                    # Install PHP 8.2
+  yads server nginx               # Switch to Nginx
+  yads database mysql             # Install MySQL
+  yads project myapp              # Create new project 'myapp'
+  yads tunnel setup               # Setup Cloudflared tunnel
 
-# Setup code-server
-setup_code_server() {
-    log "${CYAN}Setting up Code Server (VS Code Server)...${NC}"
-    
-    # Check if code-server is installed
-    if ! command -v code-server &> /dev/null; then
-        info "Installing code-server..."
-        
-        # Download and install code-server
-        curl -fsSL https://code-server.dev/install.sh | sh
-        
-        if [[ $? -eq 0 ]]; then
-            success "Code Server installed successfully"
-        else
-            error_exit "Failed to install Code Server"
-        fi
-    else
-        success "Code Server is already installed"
-    fi
-    
-    # Create systemd service for code-server
-    create_code_server_service
-    
-    # Show usage instructions
-    show_code_server_instructions
-}
+${YELLOW}Prerequisites:${NC}
+  - Ubuntu/Debian/CentOS/RHEL/Fedora/Arch Linux
+  - Root or sudo access
+  - Internet connection
+  - Cloudflare account (for tunnels)
 
-# Create code-server systemd service
-create_code_server_service() {
-    info "Creating Code Server systemd service..."
-    
-    # Create service file
-    sudo tee /etc/systemd/system/code-server.service > /dev/null << EOF
-[Unit]
-Description=Code Server
-After=network.target
-
-[Service]
-Type=simple
-User=$USER
-Group=$USER
-ExecStart=/usr/local/bin/code-server --bind-addr 0.0.0.0:8080 --auth none
-Restart=always
-RestartSec=5
-WorkingDirectory=$HOME
-
-[Install]
-WantedBy=multi-user.target
+${YELLOW}Version:${NC} $(get_version)
 EOF
-    
-    # Enable and start service
-    sudo systemctl daemon-reload
-    sudo systemctl enable code-server
-    sudo systemctl start code-server
-    
-    success "Code Server service created and started"
 }
-
-# Show code-server instructions
-show_code_server_instructions() {
-    log "${CYAN}Code Server Setup Complete!${NC}"
-    echo
-    log "${GREEN}Access your VS Code Server at:${NC}"
-    echo "  • https://vscode.${DOMAIN:-yourdomain.com}"
-    echo "  • https://code.${DOMAIN:-yourdomain.com}"
-    echo "  • https://editor.${DOMAIN:-yourdomain.com}"
-    echo "  • https://developer.${DOMAIN:-yourdomain.com}"
-    echo
-    log "${GREEN}Service Management:${NC}"
-    echo "  • Start: sudo systemctl start code-server"
-    echo "  • Stop: sudo systemctl stop code-server"
-    echo "  • Status: sudo systemctl status code-server"
-    echo "  • Logs: sudo journalctl -u code-server -f"
-    echo
-    log "${YELLOW}Note: Make sure you've run 'yads domains' to configure your domain first!${NC}"
-}
-
-# Setup project browser
-setup_project_browser() {
-    log "${CYAN}Setting up Project Browser...${NC}"
-    
-    # Check if Docker is available
-    if ! command -v docker &> /dev/null; then
-        warning "Docker not found. Installing Docker..."
-        install_docker
-    else
-        success "Docker is available"
-    fi
-    
-    # Create project browser service
-    create_project_browser_service
-    
-    # Show usage instructions
-    show_project_browser_instructions
-}
-
-# Install Docker
-install_docker() {
-    info "Installing Docker..."
-    
-    # Install Docker using the official script
-    curl -fsSL https://get.docker.com -o get-docker.sh
-    sudo sh get-docker.sh
-    sudo usermod -aG docker $USER
-    
-    # Clean up
-    rm get-docker.sh
-    
-    success "Docker installed successfully"
-    warning "You may need to log out and back in for Docker group permissions to take effect"
-}
-
-# Create project browser service
-create_project_browser_service() {
-    info "Creating Project Browser service..."
-    
-    # Create service file
-    sudo tee /etc/systemd/system/project-browser.service > /dev/null << EOF
-[Unit]
-Description=Project Browser
-After=network.target docker.service
-Requires=docker.service
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-User=$USER
-Group=$USER
-ExecStart=/bin/bash -c 'docker run -d --name project-browser -p 8083:8080 -v $HOME/development:/workspace -v /var/www/html:/var/www/html filebrowser/filebrowser --root /workspace --address 0.0.0.0 --port 8080'
-ExecStop=/bin/bash -c 'docker stop project-browser && docker rm project-browser'
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-EOF
-    
-    # Enable and start service
-    sudo systemctl daemon-reload
-    sudo systemctl enable project-browser
-    sudo systemctl start project-browser
-    
-    success "Project Browser service created and started"
-}
-
-# Show project browser instructions
-show_project_browser_instructions() {
-    log "${CYAN}Project Browser Setup Complete!${NC}"
-    echo
-    log "${GREEN}Access your Project Browser at:${NC}"
-    echo "  • https://projects.${DOMAIN:-yourdomain.com} (browse all projects)"
-    echo "  • https://erp.projects.${DOMAIN:-yourdomain.com} (browse ERP project)"
-    echo "  • https://blog.projects.${DOMAIN:-yourdomain.com} (browse Blog project)"
-    echo
-    log "${GREEN}Features:${NC}"
-    echo "  • Browse all your development projects"
-    echo "  • View and edit files in the browser"
-    echo "  • Download/upload files"
-    echo "  • Access from anywhere in the world"
-    echo
-    log "${GREEN}Service Management:${NC}"
-    echo "  • Start: sudo systemctl start project-browser"
-    echo "  • Stop: sudo systemctl stop project-browser"
-    echo "  • Status: sudo systemctl status project-browser"
-    echo "  • Logs: sudo journalctl -u project-browser -f"
-    echo
-    log "${YELLOW}Note: Make sure you've run 'yads domains' to configure your domain first!${NC}"
-}
-
-# Uninstall YADS completely
-uninstall_yads() {
-    log "${CYAN}YADS Uninstallation${NC}"
-    echo
-    log "${RED}⚠ DANGER: DESTRUCTIVE UNINSTALLATION ⚠${NC}"
-    echo
-    warning "You are about to REMOVE all YADS software and configurations."
-    warning "This includes: PHP, MySQL, PostgreSQL, NGINX/FrankenPHP, code-server,"
-    warning "Composer, GitHub CLI, Cursor CLI, and Cloudflare tunnel."
-    echo
-    warning "This action is IRREVERSIBLE and will delete server configurations."
-    warning "It is strongly recommended that you have a backup of any important data."
-    echo
-    log "${YELLOW}To confirm this destructive action, please type the following phrase exactly:${NC}"
-    echo -e "  ${GREEN}yes I want to uninstall YADS${NC}"
-    read -p "> " CONFIRM_UNINSTALL
-    
-    if [[ "$CONFIRM_UNINSTALL" != "yes I want to uninstall YADS" ]]; then
-        error_exit "Confirmation phrase did not match. Aborting uninstallation."
-    fi
-    
-    log "${CYAN}Proceeding with YADS uninstallation...${NC}"
-    
-    # Stop and disable services (with individual confirmation)
-    info "Stopping and disabling YADS services..."
-    
-    # Check and stop each service individually
-    for service in code-server project-browser cloudflared nginx frankenphp mysql postgresql redis-server; do
-        if systemctl is-active --quiet "$service" 2>/dev/null; then
-            echo
-            warning "Service '$service' is currently running."
-            read -p "Do you want to stop and disable the '$service' service? [y/N]: " STOP_SERVICE
-            if [[ "$STOP_SERVICE" =~ ^[yY]$ ]]; then
-                info "Stopping and disabling $service..."
-                sudo systemctl stop "$service" 2>/dev/null || true
-                sudo systemctl disable "$service" 2>/dev/null || true
-            else
-                warning "Skipping $service service removal."
-            fi
-        fi
-    done
-    
-    # Remove Cloudflare tunnel
-    if command -v cloudflared &> /dev/null; then
-        echo
-        warning "Cloudflare tunnel is installed."
-        read -p "Do you want to remove the Cloudflare tunnel? [y/N]: " REMOVE_CLOUDFLARE
-        if [[ "$REMOVE_CLOUDFLARE" =~ ^[yY]$ ]]; then
-            info "Removing Cloudflare tunnel..."
-            sudo cloudflared service uninstall 2>/dev/null || true
-            sudo rm -rf /etc/cloudflared /root/.cloudflared
-        else
-            warning "Skipping Cloudflare tunnel removal."
-        fi
-    fi
-    
-    # Remove Docker containers
-    if command -v docker &> /dev/null; then
-        if docker ps -a --format "table {{.Names}}" | grep -q "project-browser"; then
-            echo
-            warning "Docker container 'project-browser' is found."
-            read -p "Do you want to remove the 'project-browser' Docker container? [y/N]: " REMOVE_DOCKER
-            if [[ "$REMOVE_DOCKER" =~ ^[yY]$ ]]; then
-                info "Removing Docker containers..."
-                sudo docker stop project-browser 2>/dev/null || true
-                sudo docker rm project-browser 2>/dev/null || true
-            else
-                warning "Skipping Docker container removal."
-            fi
-        fi
-    fi
-    
-    # Purge packages (with individual confirmation)
-    echo
-    warning "The following packages will be removed if you confirm:"
-    echo "  • Web servers: nginx, frankenphp"
-    echo "  • PHP: php8.4* and related packages"
-    echo "  • Databases: mysql-server*, postgresql*"
-    echo "  • Other: redis-server*, gh, cloudflared, code-server"
-    echo
-    read -p "Do you want to remove all YADS packages? [y/N]: " REMOVE_PACKAGES
-    if [[ "$REMOVE_PACKAGES" =~ ^[yY]$ ]]; then
-        info "Purging all YADS packages..."
-        sudo apt-get remove --purge -y \
-            nginx nginx-common nginx-full \
-            php8.4* \
-            mysql-server* mysql-client* \
-            postgresql* \
-            redis-server* \
-            gh \
-            cloudflared \
-            code-server 2>/dev/null || true
-    else
-        warning "Skipping package removal."
-    fi
-    
-    # Remove manually installed binaries
-    info "Removing manually installed binaries..."
-    sudo rm -f /usr/local/bin/composer
-    sudo rm -f /usr/local/bin/frankenphp
-    sudo rm -f /usr/local/bin/code-server
-    sudo rm -f /usr/local/bin/cursor
-    
-    # Remove configuration files
-    info "Removing configuration files..."
-    sudo rm -rf /etc/nginx/sites-available/yads*
-    sudo rm -rf /etc/nginx/sites-enabled/yads*
-    sudo rm -rf /etc/systemd/system/code-server.service
-    sudo rm -rf /etc/systemd/system/project-browser.service
-    sudo rm -rf /etc/systemd/system/frankenphp.service
-    sudo rm -rf /etc/apt/sources.list.d/github-cli.list
-    sudo rm -rf /etc/apt/sources.list.d/ondrej-ubuntu-php-*
-    
-    # Clean up user data
-    warning "The script can also remove user-specific configurations and project data."
-    read -p "Do you want to delete the '~/development' directory? [y/N]: " DEL_DEVELOPMENT
-    if [[ "$DEL_DEVELOPMENT" =~ ^[yY]$ ]]; then
-        info "Deleting ~/development directory..."
-        rm -rf "$HOME/development"
-    fi
-    
-    read -p "Do you want to delete YADS configs (code-server, composer, cursor)? [y/N]: " DEL_CONFIGS
-    if [[ "$DEL_CONFIGS" =~ ^[yY]$ ]]; then
-        info "Deleting user configurations..."
-        rm -rf "$HOME/.config/code-server" \
-               "$HOME/.config/composer" \
-               "$HOME/.cursor"
-    fi
-    
-    # Ask specifically about SSH keys (more selective)
-    read -p "Do you want to delete SSH keys generated by YADS? [y/N]: " DEL_SSH_KEYS
-    if [[ "$DEL_SSH_KEYS" =~ ^[yY]$ ]]; then
-        info "Deleting YADS-generated SSH keys..."
-        # Only remove keys that were likely generated by YADS
-        rm -f "$HOME/.ssh/id_ed25519" "$HOME/.ssh/id_ed25519.pub"
-        # Note: We don't remove the entire .ssh directory to preserve authorized_keys and other keys
-        warning "Note: Only removed ED25519 keys. Other SSH keys and authorized_keys preserved."
-    fi
-    
-    # Remove YADS directory
-    info "Removing YADS configuration..."
-    rm -rf "$HOME/.yads"
-    
-    # Remove from PATH
-    info "Removing YADS from PATH..."
-    sed -i '/export PATH.*\.local\/bin/d' "$HOME/.bashrc" 2>/dev/null || true
-    sed -i '/export PATH.*\.local\/bin/d' "$HOME/.zshrc" 2>/dev/null || true
-    sed -i '/export PATH.*\.local\/bin/d' "$HOME/.profile" 2>/dev/null || true
-    
-    # Remove system-wide symlink
-    sudo rm -f /usr/local/bin/yads
-    
-    # Revert user permissions
-    info "Removing user from www-data group..."
-    sudo gpasswd -d "$USER" www-data 2>/dev/null || true
-    
-    # Clean up APT
-    info "Cleaning up package cache..."
-    sudo apt-get autoremove -y
-    sudo apt-get autoclean
-    sudo apt-get update
-    
-    # Reload systemd
-    sudo systemctl daemon-reload
-    
-    success "YADS uninstallation complete!"
-    info "The server has been cleaned of all YADS software and configurations."
-    info "You may need to log out and back in for all changes to take effect."
-}
-
-# Setup SSH keys for Git
-setup_ssh_keys() {
-    log "${CYAN}Setting up SSH keys for Git...${NC}"
-    
-    # Check if SSH key already exists
-    if [[ -f "$HOME/.ssh/id_ed25519" ]]; then
-        warning "SSH key already exists at $HOME/.ssh/id_ed25519"
-        read -p "Do you want to generate a new key? [y/N]: " GENERATE_NEW
-        if [[ ! "$GENERATE_NEW" =~ ^[yY]$ ]]; then
-            info "Using existing SSH key"
-            show_ssh_key_info
-            return 0
-        fi
-    fi
-    
-    # Get email for SSH key
-    read -p "Enter your email address (for the SSH key comment): " GIT_EMAIL
-    if [[ -z "$GIT_EMAIL" ]]; then
-        error_exit "Email address is required for SSH key generation"
-    fi
-    
-    # Generate SSH key
-    info "Generating ED25519 SSH key..."
-    ssh-keygen -t ed25519 -C "$GIT_EMAIL" -f "$HOME/.ssh/id_ed25519" -N ""
-    chmod 600 "$HOME/.ssh/id_ed25519"
-    chmod 644 "$HOME/.ssh/id_ed25519.pub"
-    
-    success "SSH key generated successfully"
-    
-    # Show key info
-    show_ssh_key_info
-    
-    # Ask about GitHub integration
-    read -p "Do you want to automatically add this key to your GitHub account? [y/N]: " ADD_TO_GITHUB
-    if [[ "$ADD_TO_GITHUB" =~ ^[yY]$ ]]; then
-        setup_github_integration
-    else
-        info "To add your SSH key to a Git service manually, copy the public key:"
-        echo -e "${YELLOW}cat ~/.ssh/id_ed25519.pub${NC}"
-    fi
-}
-
-# Show SSH key information
-show_ssh_key_info() {
-    log "${GREEN}SSH Key Information:${NC}"
-    echo
-    echo "Public key (copy this to your Git service):"
-    echo -e "${YELLOW}$(cat ~/.ssh/id_ed25519.pub)${NC}"
-    echo
-    echo "Private key location: $HOME/.ssh/id_ed25519"
-    echo "Public key location: $HOME/.ssh/id_ed25519.pub"
-    echo
-    info "Test your SSH connection with: ssh -T git@github.com"
-}
-
-# Setup GitHub integration
-setup_github_integration() {
-    # Check if GitHub CLI is installed
-    if ! command -v gh &> /dev/null; then
-        info "Installing GitHub CLI..."
-        install_github_cli
-    else
-        success "GitHub CLI is already installed"
-    fi
-    
-    echo -e "\n${YELLOW}======================= ACTION REQUIRED =======================${NC}"
-    warning "You need to authenticate the GitHub CLI with your account."
-    warning "Please follow the prompts to authenticate with GitHub."
-    echo -e "${YELLOW}===============================================================${NC}\n"
-    
-    # Authenticate with GitHub
-    gh auth login
-    
-    if [[ $? -eq 0 ]]; then
-        success "GitHub authentication successful"
-        
-        # Add SSH key to GitHub
-        info "Uploading SSH key to GitHub..."
-        KEY_TITLE="YADS Dev Server ($(hostname))"
-        gh ssh-key add "$HOME/.ssh/id_ed25519.pub" --title "$KEY_TITLE"
-        
-        if [[ $? -eq 0 ]]; then
-            success "SSH key added to your GitHub account with title: '$KEY_TITLE'"
-        else
-            warning "Failed to add SSH key to GitHub. You can add it manually."
-        fi
-    else
-        warning "GitHub authentication failed. You can add the SSH key manually."
-    fi
-}
-
-# Install GitHub CLI
-install_github_cli() {
-    info "Installing GitHub CLI..."
-    
-    # Add GitHub CLI repository
-    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-    sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-    
-    # Update and install
-    sudo apt-get update
-    sudo apt-get install -y gh
-    
-    success "GitHub CLI installed successfully"
-}
-
-# Upgrade YADS to latest version
-upgrade_yads() {
-    log "${CYAN}Upgrading YADS to latest version...${NC}"
-    
-    # Check if we're in a Git repository
-    if [[ -d ".git" ]] && [[ -f "yads" ]]; then
-        info "Detected Git repository installation..."
-        info "Pulling latest changes..."
-        
-        # Pull latest changes
-        if git pull origin master; then
-            success "YADS updated from Git repository"
-            info "Restart your terminal or run 'source ~/.bashrc' to use the latest version"
-        else
-            error_exit "Failed to pull latest changes from Git repository"
-        fi
-        return
-    fi
-    
-    # Check if YADS is installed in the standard location
-    if [[ -f "$HOME/.local/bin/yads" ]]; then
-        info "Upgrading YADS installation..."
-        
-        # Create backup
-        info "Creating backup of current installation..."
-        cp "$HOME/.local/bin/yads" "$HOME/.local/bin/yads.backup" 2>/dev/null || true
-        cp -r "$HOME/.local/bin/modules" "$HOME/.local/bin/modules.backup" 2>/dev/null || true
-        
-        # Download latest version
-        info "Downloading latest YADS..."
-        curl -fsSL "https://raw.githubusercontent.com/BCleverly/yads/master/yads" -o "$HOME/.local/bin/yads"
-        chmod +x "$HOME/.local/bin/yads"
-        
-        # Download latest modules
-        info "Downloading latest modules..."
-        mkdir -p "$HOME/.local/bin/modules"
-        curl -fsSL "https://raw.githubusercontent.com/BCleverly/yads/master/modules/install.sh" -o "$HOME/.local/bin/modules/install.sh"
-        curl -fsSL "https://raw.githubusercontent.com/BCleverly/yads/master/modules/domains.sh" -o "$HOME/.local/bin/modules/domains.sh"
-        curl -fsSL "https://raw.githubusercontent.com/BCleverly/yads/master/modules/projects.sh" -o "$HOME/.local/bin/modules/projects.sh"
-        chmod +x "$HOME/.local/bin/modules"/*.sh
-        
-        # Update version file
-        info "Updating version file..."
-        echo "1.0.1" > "$HOME/.local/bin/version"
-        
-        # Update system-wide symlink if it exists
-        if [[ -L "/usr/local/bin/yads" ]]; then
-            info "Updating system-wide symlink..."
-            sudo ln -sf "$HOME/.local/bin/yads" /usr/local/bin/yads
-        fi
-        
-        success "YADS upgraded successfully!"
-        info "You can now use the latest version of YADS"
-        
-        # Show version info
-        info "Current YADS version:"
-        yads version 2>/dev/null || echo "Version information not available"
-        
-    else
-        error_exit "YADS not found in standard installation location. Please reinstall YADS."
-    fi
-}
-
-# Get YADS version
-get_version() {
-    # Try to get version from git describe first (prefer tags)
-    if command -v git &> /dev/null && [[ -d ".git" ]]; then
-        # Get the latest tag
-        local latest_tag=$(git describe --tags --abbrev=0 2>/dev/null)
-        if [[ -n "$latest_tag" ]]; then
-            # Remove 'v' prefix if present
-            local version=${latest_tag#v}
-            echo "$version"
-            return
-        fi
-        
-        # If no tags, try git describe with commit hash
-        local git_version=$(git describe --tags --always 2>/dev/null)
-        if [[ -n "$git_version" ]]; then
-            echo "$git_version"
-            return
-        fi
-    fi
-    
-    # Try to get version from the script's directory (for installed versions)
-    local script_dir=$(dirname "$0")
-    if [[ -f "$script_dir/version" ]]; then
-        cat "$script_dir/version"
-        return
-    fi
-    
-    # Try to get version from YADS_DIR
-    if [[ -f "$YADS_DIR/version" ]]; then
-        cat "$YADS_DIR/version"
-        return
-    fi
-    
-    # Try to get version from the script itself (look for hardcoded version)
-    if [[ -f "$0" ]]; then
-        local script_version=$(grep -o 'echo "1\.[0-9]\+\.[0-9]\+"' "$0" 2>/dev/null | head -1 | sed 's/echo "\(.*\)"/\1/')
-        if [[ -n "$script_version" ]]; then
-            echo "$script_version"
-            return
-        fi
-    fi
-    
-    # Default version
-    echo "1.0.1"
-}
-
-# Show YADS version information
-show_version() {
-    local version=$(get_version)
-    local git_commit=$(git rev-parse --short HEAD 2>/dev/null || echo 'Unknown')
-    local git_date=$(git log -1 --format=%cd --date=short 2>/dev/null || echo 'Unknown')
-    local latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo 'No tags')
-    local tag_count=$(git tag | wc -l 2>/dev/null || echo '0')
-    
-    log "${CYAN}YADS - Yet Another Development Server${NC}"
-    echo
-    echo -e "${GREEN}Version:${NC} $version"
-    echo -e "${GREEN}Repository:${NC} https://github.com/BCleverly/yads"
-    echo -e "${GREEN}Installation:${NC} $HOME/.local/bin/yads"
-    echo
-    echo -e "${GREEN}Modules:${NC}"
-    echo "  • install.sh - Software installation and configuration"
-    echo "  • domains.sh - Domain and SSL certificate management"
-    echo "  • projects.sh - Project creation and management"
-    echo
-    echo -e "${GREEN}Git Information:${NC}"
-    echo "  • Latest Tag: $latest_tag"
-    echo "  • Total Tags: $tag_count"
-    echo "  • Commit: $git_commit"
-    echo "  • Date: $git_date"
-    echo "  • Branch: $(git branch --show-current 2>/dev/null || echo 'Unknown')"
-}
-
-# Check for no-color flag
-if [[ "${1:-}" == "--no-color" ]]; then
-    # Force no colors
-    RED=''
-    GREEN=''
-    YELLOW=''
-    BLUE=''
-    PURPLE=''
-    CYAN=''
-    NC=''
-    shift
-fi
 
 # Main command handler
 main() {
-    case "${1:-help}" in
-        "install")
-            check_root
-            check_sudo
-            detect_os
-            load_config
-            install_all
-            ;;
-        "domains")
-            load_config
-            configure_domains
-            ;;
-        "create")
-            if [[ -z "${2:-}" ]]; then
-                error_exit "Project name is required. Usage: yads create <project-name> [git-repo]"
-            fi
-            load_config
-            create_project "$2" "${3:-}"
-            ;;
-        "status")
-            show_status
-            ;;
-        "prerequisites"|"prereq")
-            show_prerequisites
-            ;;
-        "check"|"verify")
-            check_global_availability
-            ;;
-        "code-server"|"vscode")
-            setup_code_server
-            ;;
-        "projects"|"browser")
-            setup_project_browser
-            ;;
-        "ssh"|"keys")
-            setup_ssh_keys
-            ;;
-        "update")
-            check_sudo
-            update_software
-            ;;
-        "upgrade")
-            upgrade_yads
-            ;;
-        "version"|"--version"|"-v")
-            show_version
-            ;;
-        "uninstall")
-            check_sudo
-            uninstall_yads
-            ;;
-        "help"|"--help"|"-h")
+    setup_colors
+    
+    # Handle help and version flags
+    case "${1:-}" in
+        -h|--help|help)
             show_help
+            exit 0
+            ;;
+        -v|--version|version)
+            echo "YADS $(get_version)"
+            exit 0
+            ;;
+        "")
+            show_help
+            exit 1
+            ;;
+    esac
+    
+    local command="$1"
+    shift 2>/dev/null || true
+    
+    # Source appropriate module based on command
+    case "$command" in
+        install)
+            source_module "install"
+            install_main "$@"
+            ;;
+        uninstall)
+            source_module "uninstall"
+            uninstall_main "$@"
+            ;;
+        start|stop|restart|status)
+            source_module "services"
+            services_main "$command" "$@"
+            ;;
+        php)
+            source_module "php"
+            php_main "$@"
+            ;;
+        server)
+            source_module "webserver"
+            webserver_main "$@"
+            ;;
+        database)
+            source_module "database"
+            database_main "$@"
+            ;;
+        tunnel)
+            source_module "tunnel"
+            tunnel_main "$@"
+            ;;
+        vscode)
+            source_module "vscode"
+            vscode_main "$@"
+            ;;
+        project)
+            source_module "project"
+            project_main "$@"
             ;;
         *)
-            error_exit "Unknown command: $1. Use 'yads help' for available commands."
+            error_exit "Unknown command: $command. Use 'yads help' for available commands."
             ;;
     esac
 }
 
-# Source additional modules (only if they exist and are readable)
-# Check multiple possible locations for modules
-MODULE_DIRS=(
-    "$(dirname "$0")/modules"           # Local development
-    "$HOME/.local/bin/modules"           # Global installation
-    "/usr/local/bin/modules"             # System installation
-)
-
-for module_dir in "${MODULE_DIRS[@]}"; do
-    if [[ -d "$module_dir" ]]; then
-        # Debug: Show which module directory is being used
-        if [[ "${DEBUG:-}" == "1" ]]; then
-            echo "Loading modules from: $module_dir" >&2
-        fi
-        
-        if [[ -f "$module_dir/install.sh" ]] && [[ -r "$module_dir/install.sh" ]]; then
-            source "$module_dir/install.sh" 2>/dev/null || true
-        fi
-        if [[ -f "$module_dir/domains.sh" ]] && [[ -r "$module_dir/domains.sh" ]]; then
-            source "$module_dir/domains.sh" 2>/dev/null || true
-        fi
-        if [[ -f "$module_dir/projects.sh" ]] && [[ -r "$module_dir/projects.sh" ]]; then
-            source "$module_dir/projects.sh" 2>/dev/null || true
-        fi
-        break  # Use the first valid module directory found
-    fi
-done
-
 # Run main function with all arguments
 main "$@"
-

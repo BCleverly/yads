@@ -1,9 +1,0 @@
-# Ensure shell scripts use LF line endings
-*.sh text eol=lf
-yads text eol=lf
-modules/*.sh text eol=lf
-
-# Other files can use system default
-*.md text
-*.yml text
-*.json text
