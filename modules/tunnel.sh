@@ -60,6 +60,7 @@ check_cloudflared() {
 # Setup Cloudflared tunnel
 setup_tunnel() {
     info "☁️  Setting up Cloudflared tunnel..."
+    info "Following Cloudflare dashboard instructions: https://one.dash.cloudflare.com/networks/tunnels"
     
     check_cloudflared
     
@@ -67,24 +68,29 @@ setup_tunnel() {
     mkdir -p /etc/cloudflared
     mkdir -p /var/log/cloudflared
     
-    # Login to Cloudflare
-    info "Please login to your Cloudflare account:"
+    # Login to Cloudflare (opens browser for authentication)
+    info "🔐 Authenticating with Cloudflare..."
+    info "This will open your browser to login to Cloudflare"
     cloudflared tunnel login
     
-    # Create tunnel
+    # Create tunnel with proper naming
     local tunnel_name
     tunnel_name="${1:-yads-dev-server}"
     
-    info "Creating tunnel: $tunnel_name"
+    info "📡 Creating tunnel: $tunnel_name"
     cloudflared tunnel create "$tunnel_name"
     
-    # Get tunnel ID
+    # Get tunnel ID and credentials
     local tunnel_id
     tunnel_id=$(cloudflared tunnel list | grep "$tunnel_name" | awk '{print $1}')
     
     if [[ -z "$tunnel_id" ]]; then
-        error_exit "Failed to get tunnel ID"
+        error_exit "Failed to get tunnel ID. Please check your Cloudflare dashboard."
     fi
+    
+    info "✅ Tunnel created successfully"
+    info "Tunnel ID: $tunnel_id"
+    info "Credentials saved to: /root/.cloudflared/$tunnel_id.json"
     
     # Create tunnel configuration
     cat > /etc/cloudflared/config.yml << EOF
@@ -108,10 +114,21 @@ ingress:
   - service: http_status:404
 EOF
     
-    # Create DNS records
-    info "Creating DNS records..."
-    cloudflared tunnel route dns "$tunnel_name" code.remote.domain.tld
-    cloudflared tunnel route dns "$tunnel_name" "*.remote.domain.tld"
+    # Create DNS records (following Cloudflare dashboard workflow)
+    info "🌐 Setting up DNS records..."
+    info "This will create DNS records in your Cloudflare dashboard"
+    
+    # Get domain from user or use default
+    local domain
+    domain="${2:-remote.domain.tld}"
+    
+    info "Creating DNS records for domain: $domain"
+    cloudflared tunnel route dns "$tunnel_name" "code.$domain"
+    cloudflared tunnel route dns "$tunnel_name" "*.$domain"
+    
+    success "DNS records created:"
+    info "  - code.$domain (VS Code Server)"
+    info "  - *.$domain (Wildcard for projects)"
     
     # Create systemd service
     cat > /etc/systemd/system/cloudflared.service << EOF
@@ -137,10 +154,22 @@ EOF
     systemctl enable cloudflared
     systemctl start cloudflared
     
-    success "Cloudflared tunnel configured"
-    info "Tunnel ID: $tunnel_id"
-    info "VS Code Server: https://code.remote.domain.tld"
-    info "Projects: https://*.remote.domain.tld"
+    success "🎉 Cloudflared tunnel configured successfully!"
+    
+    # Show configuration summary
+    info "📋 Configuration Summary:"
+    info "  Tunnel ID: $tunnel_id"
+    info "  Domain: $domain"
+    info "  VS Code Server: https://code.$domain"
+    info "  Projects: https://*.$domain"
+    info "  Dashboard: https://one.dash.cloudflare.com/networks/tunnels"
+    
+    # Show next steps
+    info "🚀 Next Steps:"
+    info "  1. Check your Cloudflare dashboard for the tunnel"
+    info "  2. Verify DNS records are created"
+    info "  3. Test access to your services"
+    info "  4. Run 'yads status' to check tunnel status"
 }
 
 # Show tunnel status
@@ -247,6 +276,18 @@ EOF
     success "Tunnel configuration updated for domain: $domain"
 }
 
+# Show Cloudflare dashboard help
+show_dashboard_help() {
+    info "🌐 Cloudflare Dashboard Setup:"
+    echo
+    info "1. Visit: https://one.dash.cloudflare.com/networks/tunnels"
+    info "2. Click 'Create a tunnel'"
+    info "3. Choose 'Cloudflared' connector"
+    info "4. Follow the setup wizard"
+    echo
+    info "Alternative: Use 'yads tunnel setup' for automated setup"
+}
+
 # Main tunnel function
 tunnel_main() {
     setup_colors
@@ -257,7 +298,7 @@ tunnel_main() {
             info "Use 'yads tunnel setup' to configure tunnel"
             ;;
         setup)
-            setup_tunnel "${2:-}"
+            setup_tunnel "${2:-}" "${3:-}"
             ;;
         start)
             start_tunnel
@@ -273,6 +314,9 @@ tunnel_main() {
             ;;
         update)
             update_config "${2:-}"
+            ;;
+        dashboard)
+            show_dashboard_help
             ;;
         *)
             error_exit "Unknown tunnel option: $1"

@@ -142,6 +142,7 @@ show_help() {
     echo -e "${WHITE}  server <type>           Switch web server (apache|nginx|frankenphp)${NC}"
     echo -e "${WHITE}  database <type>         Install database (mysql|postgresql)${NC}"
     echo -e "${WHITE}  tunnel                  Configure Cloudflared tunnel${NC}"
+    echo -e "${WHITE}  tunnel dashboard         Show Cloudflare dashboard setup help${NC}"
     echo -e "${WHITE}  vscode                  Configure VS Code Server${NC}"
     echo -e "${WHITE}  project <name>          Create new project${NC}"
     echo -e "${WHITE}  help                    Show this help message${NC}"
