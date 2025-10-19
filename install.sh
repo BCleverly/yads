@@ -673,6 +673,40 @@ create_yads_structure() {
     mkdir -p "$projects_dir"
     mkdir -p /etc/yads
     
+    # Set up proper permissions for web development
+    info "🔐 Setting up proper permissions for web development..."
+    
+    # Get the current user (the one who will be developing)
+    local dev_user=""
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        dev_user="$SUDO_USER"
+    else
+        dev_user="$(whoami)"
+    fi
+    
+    # Create a web development group
+    if ! getent group webdev >/dev/null 2>&1; then
+        groupadd webdev
+    fi
+    
+    # Add the development user to the webdev group
+    usermod -a -G webdev "$dev_user"
+    
+    # Set proper ownership and permissions for projects directory
+    chown -R "$dev_user:webdev" "$projects_dir"
+    chmod -R 775 "$projects_dir"
+    
+    # Set up proper permissions for web server access
+    # Allow webdev group to write to projects directory
+    setfacl -R -m g:webdev:rwx "$projects_dir"
+    setfacl -R -d -m g:webdev:rwx "$projects_dir"
+    
+    # Ensure web server can read the projects
+    chmod 755 "$projects_dir"
+    
+    success "Permissions set up for user: $dev_user"
+    success "Projects directory: $projects_dir (owned by $dev_user:webdev)"
+    
     # Try multiple locations for YADS files
     local found_yads=false
     local yads_script=""

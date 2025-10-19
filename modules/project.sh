@@ -73,11 +73,14 @@ create_project() {
     if [[ $EUID -eq 0 ]]; then
         # Running as root
         mkdir -p "$project_dir"
+        chown "$SUDO_USER:webdev" "$project_dir"
+        chmod 775 "$project_dir"
         cd "$project_dir"
     else
         # Running as regular user, use sudo
         sudo mkdir -p "$project_dir"
-        sudo chown "$USER:$USER" "$project_dir"
+        sudo chown "$USER:webdev" "$project_dir"
+        sudo chmod 775 "$project_dir"
         cd "$project_dir"
     fi
     
