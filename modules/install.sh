@@ -64,8 +64,16 @@ install_yads() {
     # Check for existing installation
     check_existing_installation
     
-    # Get the script directory
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    # Get the script directory - handle both direct execution and sudo
+    local script_dir
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        # Running with sudo, get the original user's home directory
+        script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    else
+        # Running as regular user
+        script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    fi
+    
     local main_install_script="$script_dir/../install.sh"
     
     # Check if main install script exists

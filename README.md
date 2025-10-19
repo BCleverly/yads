@@ -32,6 +32,9 @@ git clone https://github.com/BCleverly/yads.git && cd yads && chmod +x local-set
 
 # If you get "cannot execute: required file not found" error, fix line endings first:
 git clone https://github.com/BCleverly/yads.git && cd yads && chmod +x fix-line-endings.sh && ./fix-line-endings.sh && ./local-setup.sh
+
+# If you get "sudo: yads: command not found" error, use the direct script:
+git clone https://github.com/BCleverly/yads.git && cd yads && chmod +x install.sh && sudo ./install.sh
 ```
 
 ### Basic Usage
@@ -190,6 +193,21 @@ sudo ./manual-uninstall.sh
 **Note**: SSH keys and user data are preserved during uninstallation.
 
 ## Troubleshooting
+
+### "sudo: yads: command not found" Error
+
+This happens because `sudo` doesn't have access to your user's PATH. Use one of these solutions:
+
+```bash
+# Solution 1: Use the direct script (recommended)
+sudo ./install.sh
+
+# Solution 2: Use full path to yads
+sudo ~/.local/bin/yads install
+
+# Solution 3: Preserve PATH with sudo
+sudo -E yads install
+```
 
 ### Services Not Starting
 
