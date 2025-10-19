@@ -11,13 +11,19 @@ setup_colors() {
         RED='\033[0;31m'
         GREEN='\033[0;32m'
         YELLOW='\033[1;33m'
-        BLUE='\033[0;34m'
-        CYAN='\033[0;36m'
+        BLUE='\033[0;94m'      # Light blue instead of dark blue
+        CYAN='\033[0;96m'      # Light cyan
+        WHITE='\033[1;37m'     # Bright white for better contrast
+        GRAY='\033[0;37m'      # Light gray for secondary text
         NC='\033[0m' # No Color
     else
         RED=''
         GREEN=''
         YELLOW=''
+        BLUE=''
+        CYAN=''
+        WHITE=''
+        GRAY=''
         NC=''
     fi
 }
@@ -119,20 +125,20 @@ show_status() {
     echo
     
     # Core services
-    log "${CYAN}Core Services:${NC}"
+    log "${WHITE}Core Services:${NC}"
     show_service_status "vscode-server" "VS Code Server"
     show_service_status "cloudflared" "Cloudflared Tunnel"
     echo
     
     # Web servers
-    log "${CYAN}Web Servers:${NC}"
+    log "${WHITE}Web Servers:${NC}"
     show_service_status "apache2" "Apache2"
     show_service_status "nginx" "Nginx"
     show_service_status "frankenphp" "FrankenPHP"
     echo
     
     # Databases
-    log "${CYAN}Databases:${NC}"
+    log "${WHITE}Databases:${NC}"
     show_service_status "mysql" "MySQL"
     show_service_status "postgresql" "PostgreSQL"
     show_service_status "redis" "Redis"
@@ -160,7 +166,7 @@ show_service_status() {
 
 # Show access information
 show_access_info() {
-    log "${CYAN}Access Information:${NC}"
+    log "${WHITE}Access Information:${NC}"
     
     # VS Code Server
     if systemctl is-active --quiet vscode-server; then
