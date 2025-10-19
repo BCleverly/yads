@@ -255,9 +255,11 @@ check_services() {
     echo
 }
 
-# Provide recommendations
-provide_recommendations() {
-    info "💡 Recommendations:"
+    # Provide recommendations
+    provide_recommendations
+    
+    # Offer to fix PATH issues automatically
+    offer_path_fixes
     echo
     
     # Check if we're in the right directory
@@ -315,6 +317,73 @@ main() {
     provide_recommendations
     
     success "Diagnostic complete!"
+}
+
+# Offer to fix PATH issues automatically
+offer_path_fixes() {
+    echo
+    info "🔧 Automatic PATH Fix Available:"
+    echo
+    
+    # Check if there are PATH issues
+    local path_issues=false
+    if ! command -v yads >/dev/null 2>&1; then
+        path_issues=true
+    fi
+    if ! command -v cursor-agent >/dev/null 2>&1; then
+        path_issues=true
+    fi
+    
+    if [[ "$path_issues" == true ]]; then
+        info "Would you like to automatically fix PATH issues? (y/N)"
+        read -p "> " -n 1 -r
+        echo
+        
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            info "🔧 Applying automatic PATH fixes..."
+            
+            # Apply comprehensive PATH fix
+            export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin:$HOME/.cursor/bin:$PATH"
+            
+            # Update shell config
+            local shell_config=""
+            if [[ -n "${ZSH_VERSION:-}" ]]; then
+                shell_config="$HOME/.zshrc"
+            else
+                shell_config="$HOME/.bashrc"
+            fi
+            
+            if ! grep -q "YADS PATH Configuration" "$shell_config" 2>/dev/null; then
+                cat >> "$shell_config" << 'EOF'
+
+# YADS PATH Configuration
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin:$HOME/.cursor/bin:$PATH"
+EOF
+                success "PATH configuration added to $shell_config"
+            fi
+            
+            # Test commands
+            info "🧪 Testing commands after fix..."
+            if command -v yads >/dev/null 2>&1; then
+                success "yads command is now available"
+            else
+                warning "yads command still not available"
+            fi
+            
+            if command -v cursor-agent >/dev/null 2>&1; then
+                success "cursor-agent command is now available"
+            else
+                warning "cursor-agent command still not available"
+            fi
+            
+            echo
+            info "💡 You may need to restart your terminal or run: source ~/.bashrc"
+        else
+            info "Skipping automatic PATH fixes."
+        fi
+    else
+        success "No PATH issues detected!"
+    fi
 }
 
 # Run main function

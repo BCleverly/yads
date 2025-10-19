@@ -649,6 +649,140 @@ configure_firewall() {
     success "Firewall configured"
 }
 
+# Verify and fix PATH configuration
+verify_and_fix_path() {
+    info "🔍 Verifying PATH configuration..."
+    
+    local path_issues=false
+    local fixes_applied=false
+    
+    # Check if yads command is available
+    if ! command -v yads >/dev/null 2>&1; then
+        warning "yads command not found in PATH"
+        path_issues=true
+        
+        # Try to fix by adding /usr/local/bin to PATH
+        if [[ -f "/usr/local/bin/yads" ]]; then
+            info "Adding /usr/local/bin to current session PATH..."
+            export PATH="/usr/local/bin:$PATH"
+            fixes_applied=true
+        fi
+    else
+        success "yads command is available"
+    fi
+    
+    # Check if cursor-agent command is available
+    if ! command -v cursor-agent >/dev/null 2>&1; then
+        warning "cursor-agent command not found in PATH"
+        path_issues=true
+        
+        # Try to fix by adding Cursor paths to PATH
+        local cursor_paths=("$HOME/.cursor/bin" "/usr/local/bin")
+        for cursor_path in "${cursor_paths[@]}"; do
+            if [[ -f "$cursor_path/cursor-agent" ]]; then
+                info "Adding $cursor_path to current session PATH..."
+                export PATH="$cursor_path:$PATH"
+                fixes_applied=true
+                break
+            fi
+        done
+    else
+        success "cursor-agent command is available"
+    fi
+    
+    # Check if other important commands are available
+    local important_commands=("composer" "php" "git")
+    for cmd in "${important_commands[@]}"; do
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+            warning "$cmd command not found in PATH"
+            path_issues=true
+        else
+            success "$cmd command is available"
+        fi
+    done
+    
+    # Fix shell configuration if needed
+    if [[ "$path_issues" == true ]]; then
+        info "🔧 Applying PATH fixes to shell configuration..."
+        
+        # Determine user's home directory (handle sudo case)
+        local user_home=""
+        if [[ -n "${SUDO_USER:-}" ]]; then
+            user_home="/home/$SUDO_USER"
+        else
+            user_home="$HOME"
+        fi
+        
+        # Determine shell config file
+        local shell_config=""
+        if [[ -n "${ZSH_VERSION:-}" ]]; then
+            shell_config="$user_home/.zshrc"
+        else
+            shell_config="$user_home/.bashrc"
+        fi
+        
+        # Add essential paths to shell config
+        local essential_paths=(
+            "/usr/local/bin"
+            "$HOME/.local/bin"
+            "$HOME/.cursor/bin"
+        )
+        
+        for path_dir in "${essential_paths[@]}"; do
+            if [[ -d "$path_dir" ]] && ! grep -q "export PATH.*$path_dir" "$shell_config" 2>/dev/null; then
+                info "Adding $path_dir to $shell_config"
+                echo "export PATH=\"$path_dir:\$PATH\"" >> "$shell_config"
+                fixes_applied=true
+            fi
+        done
+        
+        # Create a comprehensive PATH export
+        if [[ "$fixes_applied" == true ]]; then
+            info "Creating comprehensive PATH configuration..."
+            cat >> "$shell_config" << 'EOF'
+
+# YADS PATH Configuration
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin:$HOME/.cursor/bin:$PATH"
+EOF
+        fi
+    fi
+    
+    # Final verification
+    info "🔍 Final PATH verification..."
+    local final_issues=false
+    
+    if ! command -v yads >/dev/null 2>&1; then
+        error "yads command still not available after fixes"
+        final_issues=true
+    fi
+    
+    if ! command -v cursor-agent >/dev/null 2>&1; then
+        warning "cursor-agent command still not available (may need shell restart)"
+    fi
+    
+    if [[ "$final_issues" == true ]]; then
+        warning "Some PATH issues remain. Please run: source ~/.bashrc"
+        warning "Or restart your terminal and try again."
+    else
+        success "✅ All PATH issues resolved!"
+    fi
+    
+    # Show current PATH for debugging
+    info "Current PATH: $PATH"
+    
+    # Test commands
+    info "🧪 Testing commands..."
+    if command -v yads >/dev/null 2>&1; then
+        info "Testing yads --version:"
+        yads --version 2>/dev/null || warning "yads --version failed"
+    fi
+    
+    if command -v cursor-agent >/dev/null 2>&1; then
+        info "Testing cursor-agent --help:"
+        cursor-agent --help >/dev/null 2>&1 || warning "cursor-agent --help failed"
+    fi
+}
+
 # Main installation function
 main() {
     setup_colors
@@ -687,6 +821,9 @@ main() {
     configure_firewall
     
     success "🎉 YADS installation completed!"
+    
+    # Verify and fix PATH configuration
+    verify_and_fix_path
     
     # Run post-installation setup
     if [[ -f "$script_dir/post-install.sh" ]]; then

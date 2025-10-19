@@ -123,6 +123,86 @@ test_commands() {
     fi
 }
 
+# Comprehensive PATH verification
+verify_path_comprehensive() {
+    info "🔍 Comprehensive PATH verification..."
+    
+    # Check for missing commands and fix them
+    local missing_commands=()
+    
+    # Check yads
+    if ! command -v yads >/dev/null 2>&1; then
+        missing_commands+=("yads")
+        warning "yads command not found"
+        
+        # Try to fix by adding /usr/local/bin
+        if [[ -f "/usr/local/bin/yads" ]]; then
+            export PATH="/usr/local/bin:$PATH"
+            info "Added /usr/local/bin to PATH for yads"
+        fi
+    fi
+    
+    # Check cursor-agent
+    if ! command -v cursor-agent >/dev/null 2>&1; then
+        missing_commands+=("cursor-agent")
+        warning "cursor-agent command not found"
+        
+        # Try multiple Cursor paths
+        local cursor_paths=("$HOME/.cursor/bin" "/usr/local/bin")
+        for cursor_path in "${cursor_paths[@]}"; do
+            if [[ -f "$cursor_path/cursor-agent" ]]; then
+                export PATH="$cursor_path:$PATH"
+                info "Added $cursor_path to PATH for cursor-agent"
+                break
+            fi
+        done
+    fi
+    
+    # If we still have missing commands, apply comprehensive fix
+    if [[ ${#missing_commands[@]} -gt 0 ]]; then
+        warning "Still missing commands: ${missing_commands[*]}"
+        info "Applying comprehensive PATH fix..."
+        
+        # Create a comprehensive PATH
+        export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin:$HOME/.cursor/bin:$PATH"
+        
+        # Update shell config with comprehensive PATH
+        local shell_config=""
+        if [[ -n "${ZSH_VERSION:-}" ]]; then
+            shell_config="$HOME/.zshrc"
+        else
+            shell_config="$HOME/.bashrc"
+        fi
+        
+        # Add comprehensive PATH to shell config
+        if ! grep -q "YADS PATH Configuration" "$shell_config" 2>/dev/null; then
+            cat >> "$shell_config" << 'EOF'
+
+# YADS PATH Configuration
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin:$HOME/.cursor/bin:$PATH"
+EOF
+            info "Added comprehensive PATH to $shell_config"
+        fi
+    fi
+    
+    # Final verification
+    info "🔍 Final verification..."
+    local still_missing=()
+    
+    for cmd in yads cursor-agent; do
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+            still_missing+=("$cmd")
+        fi
+    done
+    
+    if [[ ${#still_missing[@]} -eq 0 ]]; then
+        success "✅ All commands are now available!"
+    else
+        warning "⚠️  Some commands still missing: ${still_missing[*]}"
+        warning "You may need to restart your terminal or run: source ~/.bashrc"
+    fi
+}
+
 # Show next steps
 show_next_steps() {
     info "🚀 Next Steps:"
@@ -158,12 +238,19 @@ main() {
         exit 0
     fi
     
+    # Comprehensive PATH fix
+    info "🔧 Applying comprehensive PATH fixes..."
+    
     # Fix current session
     fix_current_session
     echo
     
     # Update shell configuration
     update_shell_config
+    echo
+    
+    # Additional PATH verification and fixes
+    verify_path_comprehensive
     echo
     
     # Test commands
