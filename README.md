@@ -19,10 +19,10 @@ A remote PHP web development server with Cloudflared tunnels for internet access
 
 ```bash
 # Download and install YADS
-curl -fsSL https://raw.githubusercontent.com/your-repo/yads/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/BCleverly/yads/main/install.sh | bash
 
 # Or clone and install manually
-git clone https://github.com/your-repo/yads.git && cd yads && sudo ./install.sh
+git clone https://github.com/BCleverly/yads.git && cd yads && sudo ./install.sh
 ```
 
 ### Basic Usage
@@ -251,8 +251,8 @@ MIT License - see LICENSE file for details.
 ## Support
 
 For issues and questions:
-- GitHub Issues: [Create an issue](https://github.com/your-repo/yads/issues)
-- Documentation: [Wiki](https://github.com/your-repo/yads/wiki)
+- GitHub Issues: [Create an issue](https://github.com/BCleverly/yads/issues)
+- Documentation: [Wiki](https://github.com/BCleverly/yads/wiki)
 
 ## Changelog
 
