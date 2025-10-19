@@ -22,9 +22,7 @@ A remote PHP web development server with Cloudflared tunnels for internet access
 curl -fsSL https://raw.githubusercontent.com/your-repo/yads/main/install.sh | bash
 
 # Or clone and install manually
-git clone https://github.com/your-repo/yads.git
-cd yads
-sudo ./install.sh
+git clone https://github.com/your-repo/yads.git && cd yads && sudo ./install.sh
 ```
 
 ### Basic Usage
