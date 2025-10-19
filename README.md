@@ -6,7 +6,7 @@ A remote PHP web development server with Cloudflared tunnels for internet access
 
 - **Remote Development**: VS Code Server accessible via authentication
 - **Cloudflared Tunnels**: Secure internet access without port forwarding
-- **Multiple PHP Versions**: Support for PHP 5.6 through 8.5
+- **Multiple PHP Versions**: Support for PHP 5.6 through 8.5 (defaults to PHP 8.4)
 - **Web Server Choice**: Apache, Nginx, or FrankenPHP
 - **Database Support**: MySQL, PostgreSQL, and Redis
 - **Project Management**: Easy project creation and management

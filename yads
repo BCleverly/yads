@@ -138,7 +138,7 @@ show_help() {
     echo -e "${WHITE}  stop                    Stop all services${NC}"
     echo -e "${WHITE}  restart                 Restart all services${NC}"
     echo -e "${WHITE}  status                  Show service status${NC}"
-    echo -e "${WHITE}  php <version>           Install specific PHP version (5.6-8.5)${NC}"
+    echo -e "${WHITE}  php <version>           Install specific PHP version (5.6-8.5, defaults to 8.4)${NC}"
     echo -e "${WHITE}  server <type>           Switch web server (apache|nginx|frankenphp)${NC}"
     echo -e "${WHITE}  database <type>         Install database (mysql|postgresql)${NC}"
     echo -e "${WHITE}  tunnel                  Configure Cloudflared tunnel${NC}"

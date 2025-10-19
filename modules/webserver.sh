@@ -139,7 +139,7 @@ server {
     
     # PHP processing
     location ~ \.php$ {
-        fastcgi_pass unix:/var/run/php/php8.2-fpm.sock;
+        fastcgi_pass unix:/var/run/php/php8.4-fpm.sock;
         fastcgi_index index.php;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
         include fastcgi_params;
@@ -181,7 +181,7 @@ configure_frankenphp() {
 
 localhost, *.localhost {
     root * /var/www/projects
-    php_fastcgi unix//var/run/php/php8.2-fpm.sock
+    php_fastcgi unix//var/run/php/php8.4-fpm.sock
     
     # VS Code Server
     handle /code/* {
