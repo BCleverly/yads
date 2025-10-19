@@ -345,13 +345,30 @@ install_php() {
     
     # Install Composer
     if ! command -v composer >/dev/null 2>&1; then
-        curl -sS https://getcomposer.org/installer | php
-        mv composer.phar /usr/local/bin/composer
+        # Download Composer installer
+        curl -sS https://getcomposer.org/installer -o composer-setup.php
+        
+        # Install Composer with proper handling for root user
+        if [[ $EUID -eq 0 ]]; then
+            # Running as root, install to /usr/local/bin
+            php composer-setup.php --install-dir=/usr/local/bin --filename=composer
+        else
+            # Running as regular user
+            php composer-setup.php
+            mv composer.phar /usr/local/bin/composer
+        fi
+        
         chmod +x /usr/local/bin/composer
+        rm -f composer-setup.php
     fi
     
-    # Install Laravel installer
-    composer global require laravel/installer
+    # Install Laravel installer (skip if running as root to avoid security warning)
+    if [[ $EUID -ne 0 ]]; then
+        composer global require laravel/installer
+    else
+        info "Skipping Laravel installer installation (running as root)"
+        info "You can install it later with: composer global require laravel/installer"
+    fi
     
     success "PHP and Composer installed"
 }
