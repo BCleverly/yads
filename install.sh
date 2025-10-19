@@ -331,13 +331,21 @@ install_vscode_server() {
     chown -R "$vscode_user:$vscode_user" "/home/$vscode_user"
     
     # Set up NVM for vscode user in their home directory
+    info "Setting up NVM for vscode user..."
     sudo -u "$vscode_user" bash -c '
+        # Create NVM directory first
+        mkdir -p /home/vscode/.nvm
+        
+        # Install NVM
         export NVM_DIR="/home/vscode/.nvm"
         curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+        
+        # Source NVM and install Node.js
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
         nvm install --lts || nvm install node
         nvm use --lts || nvm use node
-    '
+        nvm alias default lts/* || nvm alias default node
+    ' || warning "NVM setup for vscode user had issues, but continuing..."
     
     # Create VS Code Server configuration for vscode user
     sudo -u "$vscode_user" mkdir -p "/home/$vscode_user/.config/code-server"
