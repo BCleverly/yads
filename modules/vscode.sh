@@ -134,33 +134,24 @@ EOF
     # Install useful extensions with proper Node.js environment
     info "Installing VS Code extensions..."
     
-    # Ensure Node.js is available for vscode user
-    local vscode_node_path
-    vscode_node_path=$(sudo -u "$vscode_user" bash -c 'export NVM_DIR="/opt/vscode-server/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"; which node' 2>/dev/null || echo "")
+    # Use the vscode user's home directory and NVM setup
+    sudo -u "$vscode_user" bash -c "
+        export NVM_DIR='/home/vscode/.nvm'
+        [ -s \"\$NVM_DIR/nvm.sh\" ] && \. \"\$NVM_DIR/nvm.sh\"
+        code-server --install-extension ms-vscode.vscode-json
+        code-server --install-extension bradlc.vscode-tailwindcss
+        code-server --install-extension ms-vscode.vscode-typescript-next
+        code-server --install-extension ms-vscode.vscode-php-debug
+    " || warning "Extension installation had issues, but VS Code Server should still work"
     
-    if [[ -n "$vscode_node_path" ]]; then
-        # Set up environment for vscode user
-        sudo -u "$vscode_user" bash -c "
-            export NVM_DIR='/opt/vscode-server/.nvm'
-            [ -s \"\$NVM_DIR/nvm.sh\" ] && \. \"\$NVM_DIR/nvm.sh\"
-            code-server --install-extension ms-vscode.vscode-json
-            code-server --install-extension bradlc.vscode-tailwindcss
-            code-server --install-extension ms-vscode.vscode-typescript-next
-            code-server --install-extension ms-vscode.vscode-php-debug
-        "
-    else
-        warning "Node.js not found for vscode user, skipping extension installation"
-        warning "VS Code Server will work but extensions may not install properly"
-    fi
-    
-    # Restart VS Code Server
+    # Restart VS Code Server using official user service
     info "🔄 Restarting VS Code Server..."
     if [[ $EUID -eq 0 ]]; then
         # Running as root
-        systemctl restart vscode-server
+        systemctl restart "code-server@$vscode_user"
     else
         # Running as regular user, use sudo
-        sudo systemctl restart vscode-server
+        sudo systemctl restart "code-server@$vscode_user"
     fi
     
     success "VS Code Server configured"
@@ -172,13 +163,13 @@ EOF
 show_status() {
     info "💻 VS Code Server Status:"
     
-    if systemctl is-active --quiet vscode-server; then
+    if systemctl is-active --quiet "code-server@vscode"; then
         success "VS Code Server: Running"
         
-        # Show password
-        if [[ -f "/opt/vscode-server/.password" ]]; then
+        # Show password from vscode user's config
+        if [[ -f "/home/vscode/.config/code-server/config.yaml" ]]; then
             local password
-            password=$(cat /opt/vscode-server/.password)
+            password=$(grep "password:" /home/vscode/.config/code-server/config.yaml | cut -d' ' -f2)
             info "Password: $password"
         fi
         
@@ -196,13 +187,13 @@ start_vscode() {
     
     check_vscode_server
     
-    if systemctl is-active --quiet vscode-server; then
+    if systemctl is-active --quiet "code-server@vscode"; then
         info "VS Code Server is already running"
         return
     fi
     
-    systemctl start vscode-server
-    systemctl enable vscode-server
+    systemctl start "code-server@vscode"
+    systemctl enable "code-server@vscode"
     
     success "VS Code Server started"
 }
@@ -211,13 +202,13 @@ start_vscode() {
 stop_vscode() {
     info "🛑 Stopping VS Code Server..."
     
-    if ! systemctl is-active --quiet vscode-server; then
+    if ! systemctl is-active --quiet "code-server@vscode"; then
         info "VS Code Server is already stopped"
         return
     fi
     
-    systemctl stop vscode-server
-    systemctl disable vscode-server
+    systemctl stop "code-server@vscode"
+    systemctl disable "code-server@vscode"
     
     success "VS Code Server stopped"
 }
@@ -239,20 +230,14 @@ change_password() {
     local new_password
     new_password=$(openssl rand -base64 32)
     
-    # Update password in config
-    local vscode_dir="/opt/vscode-server"
+    # Update password in vscode user's config
     local vscode_user="vscode"
     
-    # Update config file
-    sed -i "s/password: .*/password: $new_password/" "$vscode_dir/.config/code-server/config.yaml"
-    
-    # Update password file
-    echo "$new_password" > "$vscode_dir/.password"
-    chown "$vscode_user:$vscode_user" "$vscode_dir/.password"
-    chmod 600 "$vscode_dir/.password"
+    # Update config file in vscode user's home
+    sudo -u "$vscode_user" sed -i "s/password: .*/password: $new_password/" "/home/$vscode_user/.config/code-server/config.yaml"
     
     # Restart service
-    systemctl restart vscode-server
+    systemctl restart "code-server@$vscode_user"
     
     success "Password changed"
     info "New password: $new_password"

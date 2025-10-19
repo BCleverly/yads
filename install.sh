@@ -322,52 +322,44 @@ install_vscode_server() {
     
     success "VS Code Server installed successfully"
     
-    # Create systemd service following official approach
-    # The official install script creates a user service, but we need a system service
-    # So we'll create our own systemd service file
-    # Create a wrapper script for VS Code Server with proper Node.js environment
-    cat > /usr/local/bin/vscode-server-wrapper << 'EOF'
-#!/bin/bash
-# VS Code Server wrapper script with proper Node.js environment
-
-export NVM_DIR="/opt/vscode-server/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-
-# Start VS Code Server with proper environment
-exec /usr/local/bin/code-server "$@"
-EOF
+    # Follow official code-server installation approach
+    # The official install script creates a user service, so we'll do the same
+    # But we need to set up the vscode user properly first
     
-    chmod +x /usr/local/bin/vscode-server-wrapper
+    # Create vscode user's home directory and config
+    mkdir -p "/home/$vscode_user/.config"
+    chown -R "$vscode_user:$vscode_user" "/home/$vscode_user"
     
-    cat > /etc/systemd/system/vscode-server.service << EOF
-[Unit]
-Description=VS Code Server
-After=network.target
-
-[Service]
-Type=simple
-User=$vscode_user
-WorkingDirectory=$vscode_dir
-ExecStart=/usr/local/bin/vscode-server-wrapper --bind-addr 0.0.0.0:8080 --auth password
-Restart=always
-RestartSec=10
-Environment=PASSWORD_FILE=$vscode_dir/.password
-
-[Install]
-WantedBy=multi-user.target
-EOF
+    # Set up NVM for vscode user in their home directory
+    sudo -u "$vscode_user" bash -c '
+        export NVM_DIR="/home/vscode/.nvm"
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        nvm install --lts || nvm install node
+        nvm use --lts || nvm use node
+    '
     
-    # Generate random password
+    # Create VS Code Server configuration for vscode user
+    sudo -u "$vscode_user" mkdir -p "/home/$vscode_user/.config/code-server"
+    
+    # Generate password for vscode user
     local password
     password=$(openssl rand -base64 32)
-    echo "$password" > "$vscode_dir/.password"
-    chown "$vscode_user:$vscode_user" "$vscode_dir/.password"
-    chmod 600 "$vscode_dir/.password"
+    echo "$password" > "/home/$vscode_user/.config/code-server/config.yaml"
+    sudo -u "$vscode_user" tee "/home/$vscode_user/.config/code-server/config.yaml" > /dev/null << EOF
+bind-addr: 0.0.0.0:8080
+auth: password
+password: $password
+cert: false
+EOF
     
-    # Enable and start the service
-    systemctl daemon-reload
-    systemctl enable vscode-server
-    systemctl start vscode-server
+    chown "$vscode_user:$vscode_user" "/home/$vscode_user/.config/code-server/config.yaml"
+    chmod 600 "/home/$vscode_user/.config/code-server/config.yaml"
+    
+    # Enable and start the official user service
+    systemctl enable "code-server@$vscode_user"
+    systemctl start "code-server@$vscode_user"
+    
     
     success "VS Code Server installed"
     info "VS Code Server password: $password"
