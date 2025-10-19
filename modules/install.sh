@@ -64,9 +64,18 @@ install_yads() {
     # Check for existing installation
     check_existing_installation
     
-    # This module is called from the main install script
-    # No need to call external script
-    info "Installation module loaded successfully"
+    # Get the script directory
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local main_install_script="$script_dir/../install.sh"
+    
+    # Check if main install script exists
+    if [[ ! -f "$main_install_script" ]]; then
+        error_exit "Main installation script not found at $main_install_script"
+    fi
+    
+    # Run the main installation script
+    info "Running main installation script..."
+    bash "$main_install_script"
 }
 
 # Main install function
