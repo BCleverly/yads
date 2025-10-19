@@ -156,66 +156,127 @@ install_docker() {
 install_nodejs() {
     info "📦 Installing NVM and Node.js..."
     
-    # Check if NVM is already installed
-    if [[ -d "$HOME/.nvm" ]] && command -v nvm >/dev/null 2>&1; then
-        info "NVM already installed"
-        # Source NVM to make it available
-        source "$HOME/.nvm/nvm.sh"
+    # Determine the actual user's home directory (handle sudo case)
+    local user_home=""
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        # Running with sudo, use the original user's home
+        user_home="/home/$SUDO_USER"
+        info "Installing for user: $SUDO_USER in $user_home"
     else
-        info "Installing NVM..."
+        # Running as regular user
+        user_home="$HOME"
+        info "Installing for current user in $user_home"
+    fi
+    
+    # Check if NVM is already installed for the user
+    if [[ -d "$user_home/.nvm" ]] && sudo -u "$SUDO_USER" bash -c 'command -v nvm >/dev/null 2>&1' 2>/dev/null; then
+        info "NVM already installed for user"
+        # Source NVM to make it available
+        export NVM_DIR="$user_home/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    else
+        info "Installing NVM for user..."
         
-        # Install NVM using the official installer
-        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+        # Install NVM for the actual user (not root)
+        if [[ -n "${SUDO_USER:-}" ]]; then
+            # Running with sudo, install for the original user
+            sudo -u "$SUDO_USER" bash -c '
+                curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+            '
+        else
+            # Running as regular user
+            curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+        fi
         
         # Source NVM to make it available in current session
-        export NVM_DIR="$HOME/.nvm"
+        export NVM_DIR="$user_home/.nvm"
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
         [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
         
-        success "NVM installed successfully"
+        success "NVM installed successfully for user"
     fi
     
-    # Install latest LTS Node.js
-    info "Installing latest LTS Node.js..."
-    nvm install --lts || nvm install node
-    nvm use --lts || nvm use node
-    nvm alias default lts/* || nvm alias default node
+    # Install latest LTS Node.js for the user
+    info "Installing latest LTS Node.js for user..."
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        # Running with sudo, install Node.js for the original user
+        sudo -u "$SUDO_USER" bash -c "
+            export NVM_DIR='$user_home/.nvm'
+            [ -s \"\$NVM_DIR/nvm.sh\" ] && \. \"\$NVM_DIR/nvm.sh\"
+            nvm install --lts || nvm install node
+            nvm use --lts || nvm use node
+            nvm alias default lts/* || nvm alias default node
+        "
+    else
+        # Running as regular user
+        nvm install --lts || nvm install node
+        nvm use --lts || nvm use node
+        nvm alias default lts/* || nvm alias default node
+    fi
     
     # Verify installation
-    local node_version=$(node --version)
-    local npm_version=$(npm --version)
-    
-    success "Node.js $node_version and npm $npm_version installed"
-    
-    # Install global packages useful for development
-    info "Installing global npm packages..."
-    npm install -g yarn pnpm
-    
-    # Add NVM to shell configuration
-    local shell_config=""
-    if [[ -n "${ZSH_VERSION:-}" ]]; then
-        shell_config="$HOME/.zshrc"
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        local node_version=$(sudo -u "$SUDO_USER" bash -c "export NVM_DIR='$user_home/.nvm'; [ -s \"\$NVM_DIR/nvm.sh\" ] && \. \"\$NVM_DIR/nvm.sh\"; node --version")
+        local npm_version=$(sudo -u "$SUDO_USER" bash -c "export NVM_DIR='$user_home/.nvm'; [ -s \"\$NVM_DIR/nvm.sh\" ] && \. \"\$NVM_DIR/nvm.sh\"; npm --version")
     else
-        shell_config="$HOME/.bashrc"
+        local node_version=$(node --version)
+        local npm_version=$(npm --version)
     fi
     
-    # Add NVM to shell config if not already there
+    success "Node.js $node_version and npm $npm_version installed for user"
+    
+    # Install global packages useful for development
+    info "Installing global npm packages for user..."
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        sudo -u "$SUDO_USER" bash -c "
+            export NVM_DIR='$user_home/.nvm'
+            [ -s \"\$NVM_DIR/nvm.sh\" ] && \. \"\$NVM_DIR/nvm.sh\"
+            npm install -g yarn pnpm
+        "
+    else
+        npm install -g yarn pnpm
+    fi
+    
+    # Add NVM to shell configuration for the user
+    local shell_config=""
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
+        shell_config="$user_home/.zshrc"
+    else
+        shell_config="$user_home/.bashrc"
+    fi
+    
+    # Add NVM to user's shell config if not already there
     if ! grep -q "NVM_DIR" "$shell_config" 2>/dev/null; then
-        cat >> "$shell_config" << 'EOF'
+        cat >> "$shell_config" << EOF
 
 # NVM Configuration
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+export NVM_DIR="$user_home/.nvm"
+[ -s "\$NVM_DIR/nvm.sh" ] && \. "\$NVM_DIR/nvm.sh"
+[ -s "\$NVM_DIR/bash_completion" ] && \. "\$NVM_DIR/bash_completion"
 EOF
         info "Added NVM to $shell_config"
     fi
     
-    # Create symlinks for system-wide access
-    ln -sf "$(which node)" /usr/local/bin/node
-    ln -sf "$(which npm)" /usr/local/bin/npm
-    ln -sf "$(which yarn)" /usr/local/bin/yarn 2>/dev/null || true
-    ln -sf "$(which pnpm)" /usr/local/bin/pnpm 2>/dev/null || true
+    # Create symlinks for system-wide access using user's Node.js
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        # Get the user's Node.js paths
+        local user_node_path=$(sudo -u "$SUDO_USER" bash -c "export NVM_DIR='$user_home/.nvm'; [ -s \"\$NVM_DIR/nvm.sh\" ] && \. \"\$NVM_DIR/nvm.sh\"; which node")
+        local user_npm_path=$(sudo -u "$SUDO_USER" bash -c "export NVM_DIR='$user_home/.nvm'; [ -s \"\$NVM_DIR/nvm.sh\" ] && \. \"\$NVM_DIR/nvm.sh\"; which npm")
+        local user_yarn_path=$(sudo -u "$SUDO_USER" bash -c "export NVM_DIR='$user_home/.nvm'; [ -s \"\$NVM_DIR/nvm.sh\" ] && \. \"\$NVM_DIR/nvm.sh\"; which yarn" 2>/dev/null || echo "")
+        local user_pnpm_path=$(sudo -u "$SUDO_USER" bash -c "export NVM_DIR='$user_home/.nvm'; [ -s \"\$NVM_DIR/nvm.sh\" ] && \. \"\$NVM_DIR/nvm.sh\"; which pnpm" 2>/dev/null || echo "")
+        
+        # Create symlinks
+        ln -sf "$user_node_path" /usr/local/bin/node
+        ln -sf "$user_npm_path" /usr/local/bin/npm
+        [[ -n "$user_yarn_path" ]] && ln -sf "$user_yarn_path" /usr/local/bin/yarn
+        [[ -n "$user_pnpm_path" ]] && ln -sf "$user_pnpm_path" /usr/local/bin/pnpm
+    else
+        # Running as regular user
+        ln -sf "$(which node)" /usr/local/bin/node
+        ln -sf "$(which npm)" /usr/local/bin/npm
+        ln -sf "$(which yarn)" /usr/local/bin/yarn 2>/dev/null || true
+        ln -sf "$(which pnpm)" /usr/local/bin/pnpm 2>/dev/null || true
+    fi
     
     success "Node.js ecosystem installed and configured"
 }
