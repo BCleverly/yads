@@ -113,32 +113,14 @@ install_docker() {
         return
     fi
     
-    case "$OS" in
-        ubuntu|debian)
-            # Add Docker's official GPG key
-            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-            
-            # Add Docker repository
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-            
-            apt-get update
-            apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-            ;;
-        centos|rhel|fedora)
-            if command -v dnf >/dev/null 2>&1; then
-                dnf install -y dnf-plugins-core
-                dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
-                dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-            else
-                yum install -y yum-utils
-                yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-                yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-            fi
-            ;;
-        arch)
-            pacman -S --noconfirm docker docker-compose
-            ;;
-    esac
+    # Use official Docker installation script
+    # This follows the official Docker installation guide: https://docs.docker.com/engine/install/
+    info "Using official Docker installation script..."
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sh get-docker.sh
+    
+    # Clean up
+    rm get-docker.sh
     
     # Start and enable Docker
     systemctl start docker
@@ -532,8 +514,12 @@ install_gh_cli() {
         return
     fi
     
+    # Use official GitHub CLI installation method
+    # This follows the official GitHub CLI installation guide
     case "$OS" in
         ubuntu|debian)
+            # Official GitHub CLI installation for Debian/Ubuntu
+            type -p curl >/dev/null || (apt-get update && apt-get install curl -y)
             curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
             chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
             echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
@@ -541,6 +527,7 @@ install_gh_cli() {
             apt-get install -y gh
             ;;
         centos|rhel|fedora)
+            # Official GitHub CLI installation for RHEL-based systems
             if command -v dnf >/dev/null 2>&1; then
                 dnf install -y 'https://github.com/cli/cli/releases/download/v2.40.1/gh_2.40.1_linux_amd64.rpm'
             else
@@ -548,6 +535,7 @@ install_gh_cli() {
             fi
             ;;
         arch)
+            # Official GitHub CLI installation for Arch Linux
             pacman -S --noconfirm github-cli
             ;;
     esac
