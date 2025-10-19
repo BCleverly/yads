@@ -1023,15 +1023,32 @@ main() {
 }
 
 # Source additional modules (only if they exist and are readable)
-if [[ -f "$(dirname "$0")/modules/install.sh" ]] && [[ -r "$(dirname "$0")/modules/install.sh" ]]; then
-    source "$(dirname "$0")/modules/install.sh" 2>/dev/null || true
-fi
-if [[ -f "$(dirname "$0")/modules/domains.sh" ]] && [[ -r "$(dirname "$0")/modules/domains.sh" ]]; then
-    source "$(dirname "$0")/modules/domains.sh" 2>/dev/null || true
-fi
-if [[ -f "$(dirname "$0")/modules/projects.sh" ]] && [[ -r "$(dirname "$0")/modules/projects.sh" ]]; then
-    source "$(dirname "$0")/modules/projects.sh" 2>/dev/null || true
-fi
+# Check multiple possible locations for modules
+MODULE_DIRS=(
+    "$(dirname "$0")/modules"           # Local development
+    "$HOME/.local/bin/modules"           # Global installation
+    "/usr/local/bin/modules"             # System installation
+)
+
+for module_dir in "${MODULE_DIRS[@]}"; do
+    if [[ -d "$module_dir" ]]; then
+        # Debug: Show which module directory is being used
+        if [[ "${DEBUG:-}" == "1" ]]; then
+            echo "Loading modules from: $module_dir" >&2
+        fi
+        
+        if [[ -f "$module_dir/install.sh" ]] && [[ -r "$module_dir/install.sh" ]]; then
+            source "$module_dir/install.sh" 2>/dev/null || true
+        fi
+        if [[ -f "$module_dir/domains.sh" ]] && [[ -r "$module_dir/domains.sh" ]]; then
+            source "$module_dir/domains.sh" 2>/dev/null || true
+        fi
+        if [[ -f "$module_dir/projects.sh" ]] && [[ -r "$module_dir/projects.sh" ]]; then
+            source "$module_dir/projects.sh" 2>/dev/null || true
+        fi
+        break  # Use the first valid module directory found
+    fi
+done
 
 # Run main function with all arguments
 main "$@"
