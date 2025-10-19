@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # YADS Installation Diagnostic Script
-# Checks what was installed and what might be missing
+# Helps diagnose installation issues and PATH problems
 
 set -euo pipefail
 
@@ -49,111 +49,210 @@ error() {
     log "${RED}❌ $1${NC}"
 }
 
-# Check if YADS is installed
-check_yads_installation() {
-    info "🔍 Checking YADS installation..."
-    
-    if [[ -d "/opt/yads" ]]; then
-        success "YADS directory exists: /opt/yads"
-        if [[ -f "/opt/yads/yads" ]]; then
-            success "YADS script found: /opt/yads/yads"
-        else
-            error "YADS script missing: /opt/yads/yads"
-        fi
-    else
-        error "YADS not installed: /opt/yads directory missing"
-    fi
+# Check system information
+check_system() {
+    info "🔍 System Information:"
+    echo "  OS: $(lsb_release -d 2>/dev/null | cut -f2 || echo 'Unknown')"
+    echo "  User: $(whoami)"
+    echo "  Home: $HOME"
+    echo "  Current Directory: $(pwd)"
+    echo "  SUDO_USER: ${SUDO_USER:-'Not set'}"
+    echo
 }
 
-# Check Cursor CLI installation
-check_cursor_cli() {
-    info "🎯 Checking Cursor CLI installation..."
+# Check YADS repository files
+check_yads_files() {
+    info "📁 YADS Repository Files:"
     
-    # Check if cursor-agent command exists
-    if command -v cursor-agent >/dev/null 2>&1; then
-        success "cursor-agent command found"
-        cursor-agent --version 2>/dev/null || info "cursor-agent version check failed"
+    local current_dir="$(pwd)"
+    local script_dir=""
+    
+    # Try to get script directory
+    if [[ -n "${BASH_SOURCE[0]}" ]]; then
+        script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     else
-        error "cursor-agent command not found"
+        script_dir="$current_dir"
     fi
     
-    # Check common installation locations
-    local cursor_locations=(
-        "$HOME/.cursor/bin/cursor-agent"
-        "/usr/local/bin/cursor-agent"
-        "/opt/cursor/bin/cursor-agent"
-    )
+    echo "  Script Directory: $script_dir"
+    echo "  Current Directory: $current_dir"
+    echo
     
-    local found=false
-    for location in "${cursor_locations[@]}"; do
-        if [[ -f "$location" ]]; then
-            success "Found cursor-agent at: $location"
-            found=true
+    # Check for yads script
+    if [[ -f "$script_dir/yads" ]]; then
+        success "yads script found at: $script_dir/yads"
+        if [[ -x "$script_dir/yads" ]]; then
+            success "yads script is executable"
+        else
+            warning "yads script is not executable"
         fi
-    done
-    
-    if [[ "$found" == false ]]; then
-        error "cursor-agent not found in common locations"
+    else
+        error "yads script not found at: $script_dir/yads"
     fi
+    
+    # Check for modules directory
+    if [[ -d "$script_dir/modules" ]]; then
+        success "modules directory found at: $script_dir/modules"
+        local module_count=$(find "$script_dir/modules" -name "*.sh" | wc -l)
+        echo "  Module files: $module_count"
+    else
+        error "modules directory not found at: $script_dir/modules"
+    fi
+    
+    # Check for install.sh
+    if [[ -f "$script_dir/install.sh" ]]; then
+        success "install.sh found at: $script_dir/install.sh"
+        if [[ -x "$script_dir/install.sh" ]]; then
+            success "install.sh is executable"
+        else
+            warning "install.sh is not executable"
+        fi
+    else
+        error "install.sh not found at: $script_dir/install.sh"
+    fi
+    
+    echo
 }
 
 # Check PATH configuration
-check_path_config() {
-    info "🔧 Checking PATH configuration..."
+check_path() {
+    info "🛤️  PATH Configuration:"
     
-    echo "Current PATH:"
-    echo "$PATH" | tr ':' '\n' | grep -E "(local|cursor)" || echo "No local/cursor paths found"
+    echo "  Current PATH:"
+    echo "$PATH" | tr ':' '\n' | sed 's/^/    /'
+    echo
     
-    # Check shell config files
-    local shell_configs=("$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile")
+    # Check for ~/.local/bin in PATH
+    if [[ ":$PATH:" == *":$HOME/.local/bin:"* ]]; then
+        success "~/.local/bin is in PATH"
+    else
+        warning "~/.local/bin is NOT in PATH"
+    fi
     
-    for config in "${shell_configs[@]}"; do
-        if [[ -f "$config" ]]; then
-            if grep -q "cursor" "$config"; then
-                success "Cursor paths found in: $config"
-            else
-                warning "No cursor paths in: $config"
-            fi
-        fi
-    done
+    # Check for /usr/local/bin in PATH
+    if [[ ":$PATH:" == *":/usr/local/bin:"* ]]; then
+        success "/usr/local/bin is in PATH"
+    else
+        warning "/usr/local/bin is NOT in PATH"
+    fi
+    
+    echo
 }
 
-# Check system services
-check_services() {
-    info "🔧 Checking YADS services..."
+# Check shell configuration
+check_shell_config() {
+    info "🐚 Shell Configuration:"
     
-    local services=("vscode-server" "cloudflared" "mysql" "redis-server")
+    local shell_config=""
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
+        shell_config="$HOME/.zshrc"
+    else
+        shell_config="$HOME/.bashrc"
+    fi
     
-    for service in "${services[@]}"; do
-        if systemctl list-unit-files | grep -q "^$service.service"; then
-            if systemctl is-active --quiet "$service"; then
-                success "$service: Running"
+    echo "  Shell config: $shell_config"
+    
+    if [[ -f "$shell_config" ]]; then
+        success "Shell config file exists"
+        
+        # Check for YADS PATH entries
+        if grep -q "yads" "$shell_config" 2>/dev/null; then
+            success "YADS PATH entries found in shell config"
+        else
+            warning "No YADS PATH entries found in shell config"
+        fi
+        
+        # Check for Cursor Agent PATH entries
+        if grep -q "cursor-agent" "$shell_config" 2>/dev/null; then
+            success "Cursor Agent PATH entries found in shell config"
+        else
+            warning "No Cursor Agent PATH entries found in shell config"
+        fi
+    else
+        error "Shell config file not found: $shell_config"
+    fi
+    
+    echo
+}
+
+# Check command availability
+check_commands() {
+    info "🔧 Command Availability:"
+    
+    local commands=("yads" "cursor-agent" "code-server" "composer" "php" "git")
+    
+    for cmd in "${commands[@]}"; do
+        if command -v "$cmd" >/dev/null 2>&1; then
+            success "$cmd is available"
+            local cmd_path=$(command -v "$cmd")
+            echo "    Path: $cmd_path"
+        else
+            error "$cmd is NOT available"
+        fi
+    done
+    
+    echo
+}
+
+# Check YADS installation
+check_yads_installation() {
+    info "🏗️  YADS Installation:"
+    
+    # Check for YADS directory
+    if [[ -d "/opt/yads" ]]; then
+        success "YADS directory exists: /opt/yads"
+        
+        if [[ -f "/opt/yads/yads" ]]; then
+            success "YADS script exists in /opt/yads"
+            if [[ -x "/opt/yads/yads" ]]; then
+                success "YADS script is executable"
             else
-                warning "$service: Installed but not running"
+                warning "YADS script is not executable"
             fi
         else
-            warning "$service: Not installed"
+            error "YADS script not found in /opt/yads"
         fi
-    done
+        
+        if [[ -d "/opt/yads/modules" ]]; then
+            success "YADS modules directory exists"
+            local module_count=$(find "/opt/yads/modules" -name "*.sh" | wc -l)
+            echo "    Module files: $module_count"
+        else
+            error "YADS modules directory not found"
+        fi
+    else
+        error "YADS directory not found: /opt/yads"
+    fi
+    
+    # Check for symlink
+    if [[ -L "/usr/local/bin/yads" ]]; then
+        success "YADS symlink exists: /usr/local/bin/yads"
+        local symlink_target=$(readlink "/usr/local/bin/yads")
+        echo "    Target: $symlink_target"
+    else
+        error "YADS symlink not found: /usr/local/bin/yads"
+    fi
+    
+    echo
 }
 
-# Check installation logs
-check_installation_logs() {
-    info "📋 Checking installation logs..."
+# Check services
+check_services() {
+    info "⚙️  Services:"
     
-    if [[ -f "/var/log/yads-install.log" ]]; then
-        success "Installation log found: /var/log/yads-install.log"
-        echo "Last 10 lines:"
-        tail -10 /var/log/yads-install.log
-    else
-        warning "No installation log found"
-    fi
+    local services=("apache2" "nginx" "mysql" "postgresql" "redis-server" "code-server")
     
-    # Check systemd logs for YADS
-    if command -v journalctl >/dev/null 2>&1; then
-        echo "Recent YADS-related systemd logs:"
-        journalctl --no-pager -u yads* --since "1 hour ago" 2>/dev/null || echo "No YADS systemd logs found"
-    fi
+    for service in "${services[@]}"; do
+        if systemctl is-active --quiet "$service" 2>/dev/null; then
+            success "$service is running"
+        elif systemctl is-enabled --quiet "$service" 2>/dev/null; then
+            warning "$service is enabled but not running"
+        else
+            info "$service is not active"
+        fi
+    done
+    
+    echo
 }
 
 # Provide recommendations
@@ -161,48 +260,61 @@ provide_recommendations() {
     info "💡 Recommendations:"
     echo
     
+    # Check if we're in the right directory
+    if [[ ! -f "yads" ]] || [[ ! -d "modules" ]]; then
+        warning "You may not be in the YADS repository directory"
+        echo "  Try: cd ~/yads"
+        echo
+    fi
+    
+    # Check if install.sh is executable
+    if [[ -f "install.sh" ]] && [[ ! -x "install.sh" ]]; then
+        warning "install.sh is not executable"
+        echo "  Try: chmod +x install.sh"
+        echo
+    fi
+    
+    # Check PATH issues
+    if ! command -v yads >/dev/null 2>&1; then
+        warning "yads command not found"
+        echo "  Try: source ~/.bashrc"
+        echo "  Or: export PATH=\"\$HOME/.local/bin:\$PATH\""
+        echo
+    fi
+    
     if ! command -v cursor-agent >/dev/null 2>&1; then
-        echo "1. Install Cursor CLI manually:"
-        echo "   curl https://cursor.com/install -fsS | bash"
-        echo "   echo 'export PATH=\"\$HOME/.cursor/bin:\$PATH\"' >> ~/.bashrc"
-        echo "   source ~/.bashrc"
+        warning "cursor-agent command not found"
+        echo "  Try: source ~/.bashrc"
+        echo "  Or: export PATH=\"\$HOME/.cursor/bin:\$PATH\""
         echo
     fi
     
+    # Installation recommendations
     if [[ ! -d "/opt/yads" ]]; then
-        echo "2. Run full YADS installation:"
-        echo "   sudo ./install.sh"
+        warning "YADS not installed"
+        echo "  Try: sudo ./install.sh"
         echo
     fi
-    
-    echo "3. Check YADS status:"
-    echo "   yads status"
-    echo
 }
 
-# Main diagnostic function
+# Main function
 main() {
     setup_colors
     
-    info "🔍 YADS Installation Diagnostic"
+    log "${CYAN}🔍 YADS Installation Diagnostic${NC}"
+    log "${BLUE}==============================${NC}"
     echo
     
+    check_system
+    check_yads_files
+    check_path
+    check_shell_config
+    check_commands
     check_yads_installation
-    echo
-    
-    check_cursor_cli
-    echo
-    
-    check_path_config
-    echo
-    
     check_services
-    echo
-    
-    check_installation_logs
-    echo
-    
     provide_recommendations
+    
+    success "Diagnostic complete!"
 }
 
 # Run main function

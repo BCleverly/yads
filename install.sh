@@ -544,39 +544,76 @@ create_yads_structure() {
     
     local yads_dir="/opt/yads"
     local projects_dir="/var/www/projects"
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local script_dir=""
+    
+    # Get script directory with better detection
+    if [[ -n "${BASH_SOURCE[0]}" ]]; then
+        script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    else
+        script_dir="$(pwd)"
+    fi
+    
+    # Debug: Show what directory we're looking in
+    info "Looking for YADS files in: $script_dir"
     
     mkdir -p "$yads_dir"/{modules,config,logs}
     mkdir -p "$projects_dir"
     mkdir -p /etc/yads
     
-    # Copy modules from script directory
-    if [[ -d "$script_dir/modules" ]]; then
-        cp -r "$script_dir/modules"/* "$yads_dir/modules/"
-        chmod +x "$yads_dir/modules"/*.sh
-    else
-        # Try alternative paths when running with sudo
-        local alt_script_dir=""
-        if [[ -n "${SUDO_USER:-}" ]]; then
-            # Running with sudo, try user's home directory
-            alt_script_dir="/home/$SUDO_USER/yads"
-        fi
+    # Try multiple locations for YADS files
+    local found_yads=false
+    local yads_script=""
+    local modules_dir=""
+    
+    # Check current script directory first
+    if [[ -f "$script_dir/yads" ]] && [[ -d "$script_dir/modules" ]]; then
+        yads_script="$script_dir/yads"
+        modules_dir="$script_dir/modules"
+        found_yads=true
+        info "Found YADS files in script directory: $script_dir"
+    fi
+    
+    # If not found and running with sudo, try user's home directory
+    if [[ "$found_yads" == false ]] && [[ -n "${SUDO_USER:-}" ]]; then
+        local user_home="/home/$SUDO_USER"
+        local user_yads_dir="$user_home/yads"
         
-        if [[ -d "$alt_script_dir/modules" ]]; then
-            cp -r "$alt_script_dir/modules"/* "$yads_dir/modules/"
-            chmod +x "$yads_dir/modules"/*.sh
-        else
-            error_exit "Modules directory not found. Please run from the YADS repository directory."
+        info "Trying user's YADS directory: $user_yads_dir"
+        
+        if [[ -f "$user_yads_dir/yads" ]] && [[ -d "$user_yads_dir/modules" ]]; then
+            yads_script="$user_yads_dir/yads"
+            modules_dir="$user_yads_dir/modules"
+            found_yads=true
+            info "Found YADS files in user directory: $user_yads_dir"
         fi
     fi
     
-    # Create main yads script
-    if [[ -f "$script_dir/yads" ]]; then
-        cp "$script_dir/yads" "$yads_dir/"
-        chmod +x "$yads_dir/yads"
-    else
-        error_exit "Main yads script not found at $script_dir/yads"
+    # If still not found, try current working directory
+    if [[ "$found_yads" == false ]]; then
+        local cwd="$(pwd)"
+        info "Trying current working directory: $cwd"
+        
+        if [[ -f "$cwd/yads" ]] && [[ -d "$cwd/modules" ]]; then
+            yads_script="$cwd/yads"
+            modules_dir="$cwd/modules"
+            found_yads=true
+            info "Found YADS files in current directory: $cwd"
+        fi
     fi
+    
+    if [[ "$found_yads" == false ]]; then
+        error_exit "YADS files not found. Please run from the YADS repository directory or ensure yads script and modules directory exist."
+    fi
+    
+    # Copy modules
+    cp -r "$modules_dir"/* "$yads_dir/modules/"
+    chmod +x "$yads_dir/modules"/*.sh
+    success "Modules copied from: $modules_dir"
+    
+    # Copy main yads script
+    cp "$yads_script" "$yads_dir/"
+    chmod +x "$yads_dir/yads"
+    success "YADS script copied from: $yads_script"
     
     # Create symlink
     ln -sf "$yads_dir/yads" /usr/local/bin/yads
@@ -671,3 +708,4 @@ main() {
 
 # Run main function
 main "$@"
+
