@@ -68,68 +68,27 @@ configure_vscode() {
     
     # Create VS Code Server configuration directory with proper permissions
     info "📁 Creating VS Code Server directories..."
-    if [[ $EUID -eq 0 ]]; then
-        # Running as root
-        mkdir -p "$vscode_dir/.config/code-server"
-    else
-        # Running as regular user, use sudo
-        info "Using sudo to create VS Code Server directories..."
-        sudo mkdir -p "$vscode_dir/.config/code-server"
-    fi
+    # Use vscode user's home directory instead of /opt/vscode-server
+    local vscode_home="/home/$vscode_user"
+    sudo -u "$vscode_user" mkdir -p "$vscode_home/.config/code-server"
     
-    # Generate new password if needed
+    # Generate new password
     local password
-    if [[ ! -f "$vscode_dir/.password" ]]; then
-        password=$(openssl rand -base64 32)
-        if [[ $EUID -eq 0 ]]; then
-            # Running as root
-            echo "$password" > "$vscode_dir/.password"
-            chown "$vscode_user:$vscode_user" "$vscode_dir/.password"
-            chmod 600 "$vscode_dir/.password"
-        else
-            # Running as regular user, use sudo
-            echo "$password" | sudo tee "$vscode_dir/.password" > /dev/null
-            sudo chown "$vscode_user:$vscode_user" "$vscode_dir/.password"
-            sudo chmod 600 "$vscode_dir/.password"
-        fi
-    else
-        if [[ $EUID -eq 0 ]]; then
-            password=$(cat "$vscode_dir/.password")
-        else
-            password=$(sudo cat "$vscode_dir/.password")
-        fi
-    fi
+    password=$(openssl rand -base64 32)
     
     # Create VS Code Server configuration with proper permissions
     info "📝 Creating VS Code Server configuration..."
-    if [[ $EUID -eq 0 ]]; then
-        # Running as root
-        cat > "$vscode_dir/.config/code-server/config.yaml" << EOF
+    # Create config file as vscode user to avoid permission issues
+    sudo -u "$vscode_user" tee "$vscode_home/.config/code-server/config.yaml" > /dev/null << EOF
 bind-addr: 0.0.0.0:8080
 auth: password
 password: $password
 cert: false
 EOF
-    else
-        # Running as regular user, use sudo
-        sudo tee "$vscode_dir/.config/code-server/config.yaml" > /dev/null << EOF
-bind-addr: 0.0.0.0:8080
-auth: password
-password: $password
-cert: false
-EOF
-    fi
     
     # Set proper permissions
-    if [[ $EUID -eq 0 ]]; then
-        # Running as root
-        chown -R "$vscode_user:$vscode_user" "$vscode_dir/.config"
-        chmod 600 "$vscode_dir/.config/code-server/config.yaml"
-    else
-        # Running as regular user, use sudo
-        sudo chown -R "$vscode_user:$vscode_user" "$vscode_dir/.config"
-        sudo chmod 600 "$vscode_dir/.config/code-server/config.yaml"
-    fi
+    chown "$vscode_user:$vscode_user" "$vscode_home/.config/code-server/config.yaml"
+    chmod 600 "$vscode_home/.config/code-server/config.yaml"
     
     # Install useful extensions with proper Node.js environment
     info "Installing VS Code extensions..."
@@ -232,9 +191,10 @@ change_password() {
     
     # Update password in vscode user's config
     local vscode_user="vscode"
+    local vscode_home="/home/$vscode_user"
     
     # Update config file in vscode user's home
-    sudo -u "$vscode_user" sed -i "s/password: .*/password: $new_password/" "/home/$vscode_user/.config/code-server/config.yaml"
+    sudo -u "$vscode_user" sed -i "s/password: .*/password: $new_password/" "$vscode_home/.config/code-server/config.yaml"
     
     # Restart service
     systemctl restart "code-server@$vscode_user"

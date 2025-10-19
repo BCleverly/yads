@@ -353,7 +353,8 @@ install_vscode_server() {
     # Generate password for vscode user
     local password
     password=$(openssl rand -base64 32)
-    echo "$password" > "/home/$vscode_user/.config/code-server/config.yaml"
+    
+    # Create config file as vscode user to avoid permission issues
     sudo -u "$vscode_user" tee "/home/$vscode_user/.config/code-server/config.yaml" > /dev/null << EOF
 bind-addr: 0.0.0.0:8080
 auth: password
@@ -361,6 +362,7 @@ password: $password
 cert: false
 EOF
     
+    # Set proper permissions
     chown "$vscode_user:$vscode_user" "/home/$vscode_user/.config/code-server/config.yaml"
     chmod 600 "/home/$vscode_user/.config/code-server/config.yaml"
     
