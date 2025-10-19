@@ -26,6 +26,9 @@ git clone https://github.com/BCleverly/yads.git && cd yads && chmod +x install.s
 
 # Or use the setup script (recommended)
 git clone https://github.com/BCleverly/yads.git && cd yads && chmod +x setup.sh && ./setup.sh && sudo ./install.sh
+
+# Or make yads available locally first (for development)
+git clone https://github.com/BCleverly/yads.git && cd yads && chmod +x local-setup.sh && ./local-setup.sh
 ```
 
 ### Basic Usage

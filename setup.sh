@@ -51,9 +51,10 @@ main() {
     success "All scripts are now executable!"
     
     log "${YELLOW}Next steps:${NC}"
-    log "1. Run: sudo ./install.sh"
-    log "2. Configure: yads tunnel setup"
-    log "3. Create project: yads project myapp"
+    log "1. Make yads available locally: ./local-setup.sh"
+    log "2. Run full installation: sudo ./install.sh"
+    log "3. Configure: yads tunnel setup"
+    log "4. Create project: yads project myapp"
 }
 
 # Run main function
