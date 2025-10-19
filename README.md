@@ -36,6 +36,9 @@ git clone https://github.com/BCleverly/yads.git && cd yads && chmod +x fix-line-
 
 # If you get "sudo: yads: command not found" error, use the direct script:
 git clone https://github.com/BCleverly/yads.git && cd yads && chmod +x install.sh && sudo ./install.sh
+
+# Update YADS to latest version and reinstall to CLI path:
+cd yads && chmod +x update-yads.sh && ./update-yads.sh
 ```
 
 ### Basic Usage
@@ -192,6 +195,42 @@ sudo ./manual-uninstall.sh
 ```
 
 **Note**: SSH keys and user data are preserved during uninstallation.
+
+## Updating YADS
+
+### Automatic Update (Recommended)
+
+```bash
+# Navigate to your YADS directory
+cd ~/yads  # or wherever you cloned YADS
+
+# Run the update script
+./update-yads.sh
+```
+
+This will:
+- ✅ Pull latest changes from GitHub
+- ✅ Fix line endings automatically
+- ✅ Make all scripts executable
+- ✅ Update CLI symlink
+- ✅ Update shell configuration
+- ✅ Show update summary
+
+### Manual Update
+
+```bash
+# Pull latest changes
+git pull origin master
+
+# Fix line endings
+./fix-line-endings.sh
+
+# Make scripts executable
+./setup.sh
+
+# Reinstall to CLI path
+./local-setup.sh
+```
 
 ## Troubleshooting
 

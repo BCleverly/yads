@@ -116,6 +116,21 @@ debug_paths() {
     ls -la "$MODULES_DIR" 2>/dev/null || echo "Modules directory not found"
 }
 
+# Update YADS function
+update_yads() {
+    local script_dir
+    script_dir="$(get_script_dir)"
+    
+    if [[ -f "$script_dir/update-yads.sh" ]]; then
+        echo "🔄 Updating YADS..."
+        bash "$script_dir/update-yads.sh"
+    else
+        echo "❌ Update script not found. Please run from the YADS repository directory."
+        echo "   cd ~/yads && ./update-yads.sh"
+        exit 1
+    fi
+}
+
 # Source module with error handling
 source_module() {
     local module="$1"
@@ -147,6 +162,7 @@ show_help() {
     echo -e "${WHITE}  project <name>          Create new project${NC}"
     echo -e "${WHITE}  help                    Show this help message${NC}"
     echo -e "${WHITE}  version                 Show version information${NC}"
+    echo -e "${WHITE}  update                  Update YADS to latest version${NC}"
     echo
     echo -e "${YELLOW}Examples:${NC}"
     echo -e "${GRAY}  yads install                    # Install complete development server${NC}"
@@ -185,6 +201,10 @@ main() {
             ;;
         --debug-paths)
             debug_paths
+            exit 0
+            ;;
+        update)
+            update_yads
             exit 0
             ;;
         "")
