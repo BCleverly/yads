@@ -122,50 +122,26 @@ fix_cursor_cli() {
     fi
 }
 
-# Function to fix Node.js for VS Code Server
-fix_nodejs_vscode() {
-    info "🐘 Fixing Node.js for VS Code Server..."
+# Function to fix VS Code Server installation
+fix_vscode_server() {
+    info "💻 Fixing VS Code Server installation..."
     
-    # Check if Node.js is available
-    if command -v node >/dev/null 2>&1; then
-        local node_path="$(which node)"
-        info "Node.js found at: $node_path"
-        
-        # Create symlinks for VS Code Server
-        sudo ln -sf "$node_path" /usr/local/bin/node 2>/dev/null || true
-        sudo ln -sf "$(dirname "$node_path")/npm" /usr/local/bin/npm 2>/dev/null || true
-        
-        # Create the directory that code-server expects
-        sudo mkdir -p /usr/local/lib
-        sudo ln -sf "$node_path" /usr/local/lib/node
-        
-        success "Node.js symlinks created for VS Code Server"
+    # Check if code-server is available
+    if command -v code-server >/dev/null 2>&1; then
+        success "VS Code Server is already available"
+        return 0
+    fi
+    
+    # Install VS Code Server using official method
+    info "Installing VS Code Server using official install script..."
+    curl -fsSL https://code-server.dev/install.sh | sh
+    
+    # Verify installation
+    if command -v code-server >/dev/null 2>&1; then
+        success "VS Code Server installed successfully"
     else
-        warning "Node.js not found, attempting to install..."
-        
-        # Install Node.js via NVM
-        if [[ ! -d "$HOME/.nvm" ]]; then
-            info "Installing NVM..."
-            curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
-        fi
-        
-        # Source NVM
-        export NVM_DIR="$HOME/.nvm"
-        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-        
-        # Install Node.js LTS
-        info "Installing Node.js LTS..."
-        nvm install --lts || nvm install node
-        nvm use --lts || nvm use node
-        
-        # Create symlinks
-        local node_path="$(which node)"
-        sudo ln -sf "$node_path" /usr/local/bin/node
-        sudo ln -sf "$(dirname "$node_path")/npm" /usr/local/bin/npm
-        sudo mkdir -p /usr/local/lib
-        sudo ln -sf "$node_path" /usr/local/lib/node
-        
-        success "Node.js installed and symlinks created"
+        error "Failed to install VS Code Server"
+        return 1
     fi
 }
 
@@ -203,7 +179,7 @@ EOF
 test_commands() {
     info "🧪 Testing commands..."
     
-    local commands=("yads" "cursor-agent" "node" "npm")
+    local commands=("yads" "cursor-agent" "code-server")
     local all_working=true
     
     for cmd in "${commands[@]}"; do
@@ -232,8 +208,8 @@ main() {
     fix_cursor_cli
     echo
     
-    # Fix Node.js for VS Code Server
-    fix_nodejs_vscode
+    # Fix VS Code Server installation
+    fix_vscode_server
     echo
     
     # Fix PATH issues

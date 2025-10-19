@@ -326,59 +326,23 @@ install_vscode_server() {
         warning "Could not find Node.js for vscode user, VS Code Server may not work properly"
     fi
     
-    # Download and install VS Code Server
-    local latest_version
-    latest_version=$(curl -s https://api.github.com/repos/coder/code-server/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
+    # Install VS Code Server using official install script
+    info "Installing VS Code Server using official install script..."
     
-    cd /tmp
-    wget "https://github.com/coder/code-server/releases/download/${latest_version}/code-server-${latest_version#v}-linux-amd64.tar.gz"
-    tar -xzf "code-server-${latest_version#v}-linux-amd64.tar.gz"
+    # Use the official code-server install script
+    # This handles all the complexity and follows their recommended approach
+    curl -fsSL https://code-server.dev/install.sh | sh
     
-    # Check what was actually extracted
-    info "Checking extracted files..."
-    ls -la /tmp/
-    
-    # Find the code-server binary
-    local code_server_path
-    code_server_path=$(find /tmp -name "code-server" -type f 2>/dev/null | head -1)
-    
-    if [[ -z "$code_server_path" ]]; then
-        warning "code-server binary not found after extraction, trying package manager..."
-        
-        # Try installing via package manager as fallback
-        case "$OS" in
-            ubuntu|debian)
-                curl -fsSL https://code-server.dev/install.sh | sh
-                ;;
-            centos|rhel|fedora)
-                if command -v dnf >/dev/null 2>&1; then
-                    dnf install -y code-server
-                else
-                    yum install -y code-server
-                fi
-                ;;
-            arch)
-                pacman -S --noconfirm code-server
-                ;;
-            *)
-                error_exit "Cannot install VS Code Server on this OS: $OS"
-                ;;
-        esac
-        
-        # Verify installation
-        if ! command -v code-server >/dev/null 2>&1; then
-            error_exit "VS Code Server installation failed"
-        fi
-    else
-        info "Found code-server at: $code_server_path"
-        cp "$code_server_path" /usr/local/bin/
-        chmod +x /usr/local/bin/code-server
-        
-        # Clean up
-        rm -rf /tmp/code-server-*
+    # Verify installation
+    if ! command -v code-server >/dev/null 2>&1; then
+        error_exit "VS Code Server installation failed"
     fi
     
-    # Create systemd service
+    success "VS Code Server installed successfully"
+    
+    # Create systemd service following official approach
+    # The official install script creates a user service, but we need a system service
+    # So we'll create our own systemd service file
     cat > /etc/systemd/system/vscode-server.service << EOF
 [Unit]
 Description=VS Code Server
@@ -391,6 +355,7 @@ WorkingDirectory=$vscode_dir
 ExecStart=/usr/local/bin/code-server --bind-addr 0.0.0.0:8080 --auth password
 Restart=always
 RestartSec=10
+Environment=PASSWORD_FILE=$vscode_dir/.password
 
 [Install]
 WantedBy=multi-user.target
@@ -403,6 +368,7 @@ EOF
     chown "$vscode_user:$vscode_user" "$vscode_dir/.password"
     chmod 600 "$vscode_dir/.password"
     
+    # Enable and start the service
     systemctl daemon-reload
     systemctl enable vscode-server
     systemctl start vscode-server
