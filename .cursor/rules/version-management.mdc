@@ -1,0 +1,46 @@
+---
+globs: version,bump-version.sh,yads,install.sh
+description: Version management and Git tagging standards
+---
+
+# Version Management Standards
+
+## Version Sources (Priority Order)
+1. **Git Tags** - Primary source (e.g., `v1.0.1`)
+2. **Script Directory** - `~/.local/bin/version` file
+3. **YADS_DIR** - Configuration directory version file
+4. **Script Content** - Hardcoded version in script
+5. **Default Fallback** - Last resort version
+
+## Version Bumping Process
+- Use [bump-version.sh](mdc:bump-version.sh) for manual version bumps
+- GitHub Actions auto-bump on master pushes
+- Always update both `version` file and script content
+- Create Git tags with proper commit messages
+
+## Version File Format
+- Simple format: `1.0.1` (no `v` prefix)
+- Stored in `~/.local/bin/version` for installed versions
+- Updated during installation and upgrade processes
+
+## Git Tag Standards
+- Use semantic versioning: `v1.0.1`, `v1.1.0`, `v2.0.0`
+- Create annotated tags: `git tag -a v1.0.1 -m "Release v1.0.1"`
+- Include detailed commit messages with changes
+- Push tags: `git push origin v1.0.1`
+
+## Version Detection in Scripts
+```bash
+get_version() {
+    # Try Git tags first
+    # Fallback to version file
+    # Fallback to script content
+    # Default version as last resort
+}
+```
+
+## Upgrade System
+- `yads upgrade` detects new versions via Git tags
+- Downloads latest version from GitHub
+- Updates version file and script content
+- Shows version information after upgrade

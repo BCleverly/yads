@@ -1,0 +1,33 @@
+---
+alwaysApply: true
+description: YADS project structure and main components
+---
+
+# YADS Project Structure
+
+## Main Entry Points
+- [yads](mdc:yads) - Main CLI script with command handling and module sourcing
+- [install.sh](mdc:install.sh) - Installation script for setting up YADS
+- [manual-uninstall.sh](mdc:manual-uninstall.sh) - Manual uninstall script when normal uninstall fails
+
+## Core Modules
+- [modules/install.sh](mdc:modules/install.sh) - Software installation and configuration
+- [modules/domains.sh](mdc:modules/domains.sh) - Domain and SSL certificate management  
+- [modules/projects.sh](mdc:modules/projects.sh) - Project creation and management
+
+## Version Management
+- [version](mdc:version) - Version file (fallback for version detection)
+- [bump-version.sh](mdc:bump-version.sh) - Manual version bumping script
+- Git tags are the primary version source (v1.0.1, v1.0.2, etc.)
+
+## Testing & CI/CD
+- [.github/workflows/](mdc:.github/workflows/) - GitHub Actions workflows
+- [tests/](mdc:tests/) - Bats test suite for comprehensive testing
+- [Makefile](mdc:Makefile) - Test running and project management
+
+## Key Features
+- **Modular Design**: Main script sources modules dynamically
+- **Version Detection**: Multiple fallbacks (Git tags, version file, script content)
+- **Service Management**: Individual permission prompts for uninstall
+- **Cross-Platform**: Works on Ubuntu, Debian, CentOS, RHEL, Fedora, Arch
+- **Line Endings**: Uses LF line endings (configured in .gitattributes)

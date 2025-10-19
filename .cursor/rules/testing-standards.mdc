@@ -1,0 +1,53 @@
+---
+globs: tests/*.bats,tests/*.sh,.github/workflows/test-*.yml
+description: Testing standards and patterns for YADS
+---
+
+# Testing Standards for YADS
+
+## Test Suite Structure
+- [tests/](mdc:tests/) - Main test directory using Bats framework
+- [tests/yads.bats](mdc:tests/yads.bats) - Core YADS functionality tests
+- [tests/install.bats](mdc:tests/install.bats) - Installation process tests
+- [tests/domains.bats](mdc:tests/domains.bats) - Domain configuration tests
+- [tests/projects.bats](mdc:tests/projects.bats) - Project creation tests
+
+## GitHub Actions Testing
+- [.github/workflows/test-syntax.yml](mdc:.github/workflows/test-syntax.yml) - Syntax validation
+- [.github/workflows/test-installation.yml](mdc:.github/workflows/test-installation.yml) - Installation testing
+- [.github/workflows/test-release.yml](mdc:.github/workflows/test-release.yml) - Full release testing
+
+## Test Patterns
+- Use descriptive test names: `@test "yads version shows correct information"`
+- Mock external commands when needed
+- Test both success and failure scenarios
+- Verify file permissions and executable status
+- Test line ending compatibility
+
+## Common Test Commands
+```bash
+# Test syntax
+bash -n script.sh
+
+# Test executable permissions
+[[ -x script.sh ]]
+
+# Test line endings
+file script.sh | grep -q "CRLF"
+
+# Test version detection
+yads --version
+```
+
+## Mock Patterns
+- Mock system commands: `systemctl`, `docker`, `git`
+- Mock package managers: `apt-get`, `yum`, `dnf`
+- Mock external services: `cloudflared`, `certbot`
+- Provide realistic mock responses
+
+## Test Environment Setup
+- Set executable permissions before testing
+- Create test users and directories
+- Mock system services and commands
+- Clean up after tests
+- Test cross-platform compatibility

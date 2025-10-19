@@ -1,0 +1,46 @@
+---
+globs: *.sh,yads
+description: Bash scripting standards and best practices for YADS
+---
+
+# Bash Scripting Standards for YADS
+
+## Script Structure
+- Always start with `#!/bin/bash`
+- Use `set -euo pipefail` for strict error handling
+- Source modules with existence and readability checks
+- Use proper function definitions with local variables
+
+## Color Output
+- Use color variables: `RED`, `GREEN`, `YELLOW`, `BLUE`, `CYAN`, `NC`
+- Implement `setup_colors()` function for intelligent color detection
+- Support `--no-color` flag and `NO_COLOR` environment variable
+- Use `echo -e` for color output, not `cat << EOF`
+
+## Error Handling
+- Use `error_exit()` for fatal errors with clear messages
+- Use `warning()` for non-fatal warnings
+- Use `info()` for informational messages
+- Use `success()` for success confirmations
+- Always provide helpful error messages
+
+## Version Detection Pattern
+```bash
+get_version() {
+    # Try Git tags first (preferred)
+    # Fallback to version file
+    # Fallback to script content
+    # Default version as last resort
+}
+```
+
+## Service Management
+- Always ask permission before removing services
+- Check if services are running before attempting to stop them
+- Provide clear warnings about destructive actions
+- Use individual confirmation prompts for each service
+
+## File Permissions
+- Ensure scripts are executable: `chmod +x script.sh`
+- Set executable permissions in GitHub Actions workflows
+- Handle line ending issues (CRLF vs LF) properly

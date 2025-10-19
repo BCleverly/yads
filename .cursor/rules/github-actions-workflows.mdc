@@ -1,0 +1,35 @@
+---
+globs: .github/workflows/*.yml
+description: GitHub Actions workflow patterns and standards
+---
+
+# GitHub Actions Workflow Standards
+
+## Workflow Structure
+- Use descriptive names and clear step descriptions
+- Set `fetch-depth: 0` for Git tag access
+- Use `persist-credentials: true` for push operations
+- Configure proper triggers (push, pull_request, workflow_dispatch)
+
+## Version Bumping Workflows
+- [.github/workflows/auto-version.yml](mdc:.github/workflows/auto-version.yml) - Automatic version bumping on master pushes
+- [.github/workflows/version-bump.yml](mdc:.github/workflows/version-bump.yml) - Manual version bumping
+- Always create Git tags with `v` prefix (e.g., `v1.0.1`)
+- Update both `version` file and script content
+
+## Testing Workflows
+- [.github/workflows/test-syntax.yml](mdc:.github/workflows/test-syntax.yml) - Syntax and structure testing
+- [.github/workflows/test-installation.yml](mdc:.github/workflows/test-installation.yml) - Installation process testing
+- [.github/workflows/test-release.yml](mdc:.github/workflows/test-release.yml) - Full release testing
+
+## Common Patterns
+- Set executable permissions: `chmod +x yads install.sh modules/*.sh`
+- Test line endings: `file script.sh | grep -q "CRLF"`
+- Use proper error handling and exit codes
+- Generate detailed test reports with emoji indicators
+
+## Path Ignore Patterns
+- Ignore documentation files: `README.md`, `MANUAL-UNINSTALL.md`
+- Ignore utility scripts: `fix-*.sh`, `test-*.sh`, `manual-uninstall.sh`
+- Ignore version files: `version`, `bump-version.sh`
+- Ignore Git files: `.gitignore`

@@ -1,0 +1,45 @@
+---
+globs: install.sh,manual-uninstall.sh,yads
+description: Installation and uninstall process standards
+---
+
+# Installation and Uninstall Standards
+
+## Installation Process
+- [install.sh](mdc:install.sh) - Main installation script
+- Check for Git repository first (for development installs)
+- Download from GitHub for production installs
+- Create version file during installation
+- Set executable permissions on all scripts
+- Add to PATH and create system-wide symlink
+
+## Uninstall Process
+- [yads uninstall] - Interactive uninstall with confirmations
+- [manual-uninstall.sh](mdc:manual-uninstall.sh) - Manual uninstall when normal fails
+- Ask permission for each service individually
+- Provide clear warnings about destructive actions
+- Preserve user data (SSH keys, development directory) with options
+
+## Service Management
+- Check if services are running before stopping
+- Ask permission before removing each service
+- Provide detailed information about what will be removed
+- Use clear, prominent warnings for destructive actions
+
+## Conflict Detection
+- Detect Apache2/HTTPD conflicts with prominent warnings
+- Show exactly what will be deleted
+- Use multiple confirmation prompts
+- Provide clear options (YES/NO)
+
+## File Permissions
+- Ensure all scripts are executable: `chmod +x`
+- Handle line ending issues (CRLF vs LF)
+- Set proper permissions in GitHub Actions workflows
+- Test executable permissions in CI/CD
+
+## User Experience
+- Provide clear progress indicators
+- Show helpful error messages
+- Offer multiple installation methods
+- Support both development and production installs

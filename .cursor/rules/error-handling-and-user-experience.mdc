@@ -1,0 +1,55 @@
+---
+globs: *.sh,yads,modules/*.sh
+description: Error handling and user experience standards
+---
+
+# Error Handling and User Experience Standards
+
+## Error Message Standards
+- Use clear, actionable error messages
+- Provide helpful suggestions for resolution
+- Use appropriate log levels: `error_exit()`, `warning()`, `info()`, `success()`
+- Include context about what went wrong and how to fix it
+
+## Color and Output Standards
+- Use consistent color scheme: `RED`, `GREEN`, `YELLOW`, `BLUE`, `CYAN`, `NC`
+- Implement `setup_colors()` for intelligent color detection
+- Support `--no-color` flag and `NO_COLOR` environment variable
+- Use `echo -e` for color output, not heredoc
+
+## Confirmation Prompts
+- Use clear, specific questions
+- Provide default answers (usually "N" for destructive actions)
+- Show exactly what will happen
+- Use prominent warnings for destructive actions
+
+## Progress Indicators
+- Show clear progress through installation steps
+- Provide helpful status messages
+- Use emojis and visual indicators for better UX
+- Show completion confirmations
+
+## Warning Patterns
+```bash
+# Destructive action warning
+log "${RED}🚨 CRITICAL WARNING: APACHE2 CONFLICT DETECTED 🚨${NC}"
+echo "=================================================="
+warning "Apache2/HTTPD is already installed and will CONFLICT with YADS."
+
+# Clear action description
+log "${RED}🔥 WHAT WILL BE DELETED IF YOU CONTINUE:${NC}"
+echo "  🗑️  Apache2/HTTPD will be COMPLETELY REMOVED"
+echo "  🛑 All Apache2/HTTPD services will be STOPPED"
+```
+
+## Help and Documentation
+- Provide comprehensive help with `yads help`
+- Show prerequisites and system requirements
+- Include examples and usage patterns
+- Display version and Git information clearly
+
+## Error Recovery
+- Provide manual uninstall options when normal uninstall fails
+- Offer alternative installation methods
+- Give clear troubleshooting steps
+- Support both automated and manual processes
