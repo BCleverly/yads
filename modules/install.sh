@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Installation module for YADS
+set -euo pipefail
 
 # Detect and remove existing software
 detect_and_remove() {
@@ -476,13 +477,41 @@ install_postgresql() {
 configure_postgresql() {
     info "Configuring PostgreSQL..."
     
-    # Create development user
-    sudo -u postgres psql -c "CREATE USER yads WITH PASSWORD 'yads_dev_$(openssl rand -base64 16)';"
-    sudo -u postgres psql -c "CREATE DATABASE yads_dev OWNER yads;"
-    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE yads_dev TO yads;"
+    # Wait for PostgreSQL to be ready
+    info "Waiting for PostgreSQL to be ready..."
+    local max_attempts=30
+    local attempt=0
+    while [[ $attempt -lt $max_attempts ]]; do
+        if sudo -u postgres psql -c "SELECT 1;" >/dev/null 2>&1; then
+            success "PostgreSQL is ready"
+            break
+        fi
+        sleep 2
+        ((attempt++))
+        info "Waiting for PostgreSQL... (attempt $attempt/$max_attempts)"
+    done
     
-    # Configure PostgreSQL for development
-    sudo tee -a /etc/postgresql/*/main/postgresql.conf > /dev/null << EOF
+    if [[ $attempt -eq $max_attempts ]]; then
+        warning "PostgreSQL may not be fully ready, but continuing with configuration..."
+    fi
+    
+    # Create development user (with error handling)
+    info "Creating PostgreSQL development user..."
+    sudo -u postgres psql -c "CREATE USER yads WITH PASSWORD 'yads_dev_$(openssl rand -base64 16)';" 2>/dev/null || warning "User 'yads' may already exist"
+    sudo -u postgres psql -c "CREATE DATABASE yads_dev OWNER yads;" 2>/dev/null || warning "Database 'yads_dev' may already exist"
+    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE yads_dev TO yads;" 2>/dev/null || true
+    
+    # Configure PostgreSQL for development (find the correct config file)
+    local postgresql_conf=""
+    if [[ -d "/etc/postgresql" ]]; then
+        postgresql_conf=$(find /etc/postgresql -name "postgresql.conf" | head -1)
+    elif [[ -f "/etc/postgresql/postgresql.conf" ]]; then
+        postgresql_conf="/etc/postgresql/postgresql.conf"
+    fi
+    
+    if [[ -n "$postgresql_conf" ]]; then
+        info "Configuring PostgreSQL at: $postgresql_conf"
+        sudo tee -a "$postgresql_conf" > /dev/null << EOF
 # YADS Development Configuration
 listen_addresses = 'localhost'
 port = 5432
@@ -494,6 +523,9 @@ checkpoint_completion_target = 0.9
 wal_buffers = 16MB
 default_statistics_target = 100
 EOF
+    else
+        warning "Could not find PostgreSQL configuration file, skipping configuration"
+    fi
     
     # Restart PostgreSQL
     sudo systemctl restart postgresql
@@ -978,33 +1010,53 @@ install_all() {
     log "${CYAN}Starting YADS installation...${NC}"
     
     # Check prerequisites first
+    info "Step 1/10: Checking prerequisites..."
     check_prerequisites
     
     # Update system
+    info "Step 2/10: Updating system packages..."
     update_system
     
     # Install core software
+    info "Step 3/10: Installing PHP..."
     install_php
+    
+    info "Step 4/10: Installing MySQL..."
     install_mysql
+    
+    info "Step 5/10: Installing PostgreSQL..."
     install_postgresql
+    
+    info "Step 6/10: Installing Composer..."
     install_composer
+    
+    info "Step 7/10: Installing GitHub CLI..."
     install_github_cli
+    
+    info "Step 8/10: Installing Cursor CLI..."
     install_cursor_cli
+    
+    info "Step 9/10: Installing Cloudflare tunnel..."
     install_cloudflared
     
     # Check for conflicting web servers
+    info "Step 10/10: Checking for conflicting web servers..."
     detect_and_remove "apache2" "apache2"
     
     # Choose and install web server
+    info "Installing web server..."
     choose_web_server
     
     # Configure permissions
+    info "Configuring permissions..."
     configure_permissions
     
     # Configure SSH keys
+    info "Configuring SSH keys..."
     configure_ssh_keys
     
     # Save configuration
+    info "Saving configuration..."
     save_config
     
     success "YADS installation completed successfully!"
