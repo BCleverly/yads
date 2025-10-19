@@ -307,6 +307,25 @@ install_vscode_server() {
         nvm use --lts || nvm use node
     ' || warning "NVM setup for vscode user had issues, but continuing..."
     
+    # Create system-wide Node.js symlinks for VS Code Server
+    info "Creating system-wide Node.js symlinks..."
+    local vscode_node_path
+    vscode_node_path=$(sudo -u "$vscode_user" bash -c 'export NVM_DIR="/opt/vscode-server/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"; which node' 2>/dev/null || echo "")
+    
+    if [[ -n "$vscode_node_path" ]] && [[ -f "$vscode_node_path" ]]; then
+        # Create symlinks for system-wide access
+        ln -sf "$vscode_node_path" /usr/local/bin/node
+        ln -sf "$(dirname "$vscode_node_path")/npm" /usr/local/bin/npm 2>/dev/null || true
+        
+        # Create the directory that code-server expects
+        mkdir -p /usr/local/lib
+        ln -sf "$vscode_node_path" /usr/local/lib/node
+        
+        success "Node.js symlinks created for VS Code Server"
+    else
+        warning "Could not find Node.js for vscode user, VS Code Server may not work properly"
+    fi
+    
     # Download and install VS Code Server
     local latest_version
     latest_version=$(curl -s https://api.github.com/repos/coder/code-server/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
@@ -579,15 +598,31 @@ install_cursor_cli() {
         return
     fi
     
-    # Install Cursor CLI using the official installer
-    curl https://cursor.com/install -fsS | bash
+    # Determine user's home directory (handle sudo case)
+    local user_home=""
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        # Running with sudo, use the original user's home
+        user_home="/home/$SUDO_USER"
+    else
+        # Running as regular user
+        user_home="$HOME"
+    fi
+    
+    # Install Cursor CLI using the official installer for the correct user
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        # Running with sudo, install for the original user
+        sudo -u "$SUDO_USER" bash -c 'curl https://cursor.com/install -fsS | bash'
+    else
+        # Running as regular user
+        curl https://cursor.com/install -fsS | bash
+    fi
     
     # Add to PATH if not already there
     if ! command -v cursor-agent >/dev/null 2>&1; then
         # Try to find the installation directory
         local cursor_path=""
-        if [[ -f "$HOME/.cursor/bin/cursor-agent" ]]; then
-            cursor_path="$HOME/.cursor/bin"
+        if [[ -f "$user_home/.cursor/bin/cursor-agent" ]]; then
+            cursor_path="$user_home/.cursor/bin"
         elif [[ -f "/usr/local/bin/cursor-agent" ]]; then
             cursor_path="/usr/local/bin"
         fi
