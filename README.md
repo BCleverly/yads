@@ -22,10 +22,10 @@ A remote PHP web development server with Cloudflared tunnels for internet access
 # Download and install YADS
 curl -fsSL https://raw.githubusercontent.com/BCleverly/yads/main/install.sh | bash
 
-# Or clone and install manually
-git clone https://github.com/BCleverly/yads.git && cd yads && chmod +x install.sh && sudo ./install.sh
+# One-liner installation (recommended)
+git clone https://github.com/BCleverly/yads.git && cd yads && chmod +x *.sh && sudo ./install.sh
 
-# Or use the setup script (recommended)
+# Or use the setup script
 git clone https://github.com/BCleverly/yads.git && cd yads && chmod +x setup.sh && ./setup.sh && sudo ./install.sh
 
 # Or make yads available locally first (for development)
@@ -39,6 +39,9 @@ git clone https://github.com/BCleverly/yads.git && cd yads && chmod +x install.s
 
 # Update YADS to latest version and reinstall to CLI path:
 cd yads && chmod +x update-yads.sh && ./update-yads.sh
+
+# Complete fresh installation (one-liner):
+git clone https://github.com/BCleverly/yads.git && cd yads && chmod +x *.sh && sudo ./install.sh
 ```
 
 ### Basic Usage
