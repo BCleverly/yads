@@ -494,15 +494,25 @@ install_cursor_cli() {
     # Ensure cursor-agent is ready and waiting on CLI
     info "🎯 Setting up Cursor Agent for CLI use..."
     
-    # Add to user's shell configuration
+    # Add to user's shell configuration (handle sudo case)
+    local user_home=""
     local shell_config=""
-    if [[ -n "${ZSH_VERSION:-}" ]]; then
-        shell_config="$HOME/.zshrc"
+    
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        # Running with sudo, use the original user's home
+        user_home="/home/$SUDO_USER"
     else
-        shell_config="$HOME/.bashrc"
+        # Running as regular user
+        user_home="$HOME"
     fi
     
-    # Add Cursor Agent to PATH in shell config
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
+        shell_config="$user_home/.zshrc"
+    else
+        shell_config="$user_home/.bashrc"
+    fi
+    
+    # Add Cursor Agent to PATH in user's shell config
     if ! grep -q "cursor-agent" "$shell_config" 2>/dev/null; then
         echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$shell_config"
         echo 'export PATH="$HOME/.cursor/bin:$PATH"' >> "$shell_config"
@@ -641,11 +651,18 @@ main() {
     
     success "🎉 YADS installation completed!"
     
+    # Run post-installation setup
+    if [[ -f "$script_dir/post-install.sh" ]]; then
+        info "🔧 Running post-installation setup..."
+        bash "$script_dir/post-install.sh"
+    fi
+    
     log "${YELLOW}Next steps:${NC}"
-    log "1. Configure Cloudflared tunnel: yads tunnel setup"
-    log "2. Configure VS Code Server: yads vscode setup"
-    log "3. Create your first project: yads project myapp"
-    log "4. Check service status: yads status"
+    log "1. Restart your terminal or run: source ~/.bashrc"
+    log "2. Configure Cloudflared tunnel: yads tunnel setup"
+    log "3. Configure VS Code Server: yads vscode setup"
+    log "4. Create your first project: yads project myapp"
+    log "5. Check service status: yads status"
     
     log "${BLUE}VS Code Server:${NC} http://localhost:8080"
     log "${BLUE}Projects directory:${NC} /var/www/projects"
