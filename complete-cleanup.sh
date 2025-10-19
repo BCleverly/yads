@@ -250,10 +250,7 @@ main() {
     success "🎉 Complete cleanup finished!"
     echo
     info "To start fresh:"
-    info "  git clone https://github.com/BCleverly/yads.git"
-    info "  cd yads"
-    info "  chmod +x *.sh"
-    info "  sudo ./install.sh"
+    info "  git clone https://github.com/BCleverly/yads.git && cd yads && chmod +x *.sh && sudo ./install.sh"
 }
 
 # Run main function
