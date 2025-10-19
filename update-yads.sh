@@ -158,11 +158,22 @@ reinstall_cli() {
 update_shell_config() {
     info "🔧 Updating shell configuration..."
     
+    # Handle sudo case - use actual user's home directory
+    local user_home=""
     local shell_config=""
-    if [[ -n "${ZSH_VERSION:-}" ]]; then
-        shell_config="$HOME/.zshrc"
+    
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        # Running with sudo, use the original user's home
+        user_home="/home/$SUDO_USER"
     else
-        shell_config="$HOME/.bashrc"
+        # Running as regular user
+        user_home="$HOME"
+    fi
+    
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
+        shell_config="$user_home/.zshrc"
+    else
+        shell_config="$user_home/.bashrc"
     fi
     
     # Check if PATH is already configured

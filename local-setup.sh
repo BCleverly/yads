@@ -98,14 +98,24 @@ main() {
         ls -la "$local_bin/yads"
     fi
     
-    # Add to PATH if not already there
+    # Add to PATH if not already there (handle sudo case)
+    local user_home=""
     local shell_config=""
-    if [[ -n "${ZSH_VERSION:-}" ]]; then
-        shell_config="$HOME/.zshrc"
-    elif [[ -n "${BASH_VERSION:-}" ]]; then
-        shell_config="$HOME/.bashrc"
+    
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        # Running with sudo, use the original user's home
+        user_home="/home/$SUDO_USER"
     else
-        shell_config="$HOME/.profile"
+        # Running as regular user
+        user_home="$HOME"
+    fi
+    
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
+        shell_config="$user_home/.zshrc"
+    elif [[ -n "${BASH_VERSION:-}" ]]; then
+        shell_config="$user_home/.bashrc"
+    else
+        shell_config="$user_home/.profile"
     fi
     
     if [[ -f "$shell_config" ]] && ! grep -q "export PATH=\"\$HOME/.local/bin:\$PATH\"" "$shell_config"; then
