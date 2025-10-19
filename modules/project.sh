@@ -102,9 +102,16 @@ create_project() {
             ;;
     esac
     
-    # Set proper permissions
-    chown -R www-data:www-data "$project_dir"
-    chmod -R 755 "$project_dir"
+    # Set proper permissions (keep webdev group ownership)
+    if [[ $EUID -eq 0 ]]; then
+        # Running as root
+        chown -R "$SUDO_USER:webdev" "$project_dir"
+        chmod -R 775 "$project_dir"
+    else
+        # Running as regular user, use sudo
+        sudo chown -R "$USER:webdev" "$project_dir"
+        sudo chmod -R 775 "$project_dir"
+    fi
     
     success "Project '$project_name' created at: $project_dir"
     info "Access: http://$project_name.remote.domain.tld"
