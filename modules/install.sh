@@ -283,6 +283,33 @@ remove_apache2() {
     success "Apache2/HTTPD removed"
 }
 
+# Fix broken MySQL installations
+fix_broken_mysql() {
+    info "Checking for broken MySQL installations..."
+    
+    # Check if MySQL packages are in a broken state
+    if dpkg -l | grep -q "mysql-server.*unconfigured" || dpkg -l | grep -q "mysql-server.*half-configured"; then
+        warning "Detected broken MySQL installation. Attempting to fix..."
+        
+        # Stop any running MySQL processes
+        sudo pkill -f mysql 2>/dev/null || true
+        sudo systemctl stop mysql mysqld 2>/dev/null || true
+        
+        # Remove broken packages
+        sudo apt-get remove --purge -y mysql-server mysql-client mysql-common mysql-server-core-* mysql-client-core-* 2>/dev/null || true
+        
+        # Clean up configuration files
+        sudo rm -rf /etc/mysql /var/lib/mysql /var/log/mysql 2>/dev/null || true
+        
+        # Fix package database
+        sudo apt-get autoremove -y
+        sudo apt-get autoclean
+        sudo dpkg --configure -a 2>/dev/null || true
+        
+        success "MySQL cleanup completed"
+    fi
+}
+
 # Skip functions for existing software
 skip_php() {
     info "Skipping PHP installation (keeping existing)"
@@ -409,7 +436,44 @@ install_mysql() {
     
     case "$OS" in
         "ubuntu"|"debian")
-            sudo apt-get install -y mysql-server mysql-client
+            # Fix MySQL configuration issues on Ubuntu 24.04
+            info "Preparing MySQL installation..."
+            
+            # Fix any broken MySQL installations first
+            fix_broken_mysql
+            
+            # Clean up any remaining MySQL installations
+            sudo apt-get remove --purge -y mysql-server mysql-client mysql-common mysql-server-core-* mysql-client-core-* 2>/dev/null || true
+            sudo apt-get autoremove -y
+            sudo apt-get autoclean
+            
+            # Remove any existing MySQL configuration that might be causing issues
+            sudo rm -rf /etc/mysql /var/lib/mysql /var/log/mysql 2>/dev/null || true
+            
+            # Update package lists
+            sudo apt-get update
+            
+            # Install MySQL with proper configuration
+            info "Installing MySQL server and client..."
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y mysql-server mysql-client
+            
+            # Create MySQL configuration directory if it doesn't exist
+            sudo mkdir -p /etc/mysql/mysql.conf.d
+            
+            # Create basic MySQL configuration file
+            sudo tee /etc/mysql/mysql.cnf > /dev/null << EOF
+[mysql]
+default-character-set = utf8mb4
+
+[mysqld]
+default-storage-engine = InnoDB
+character-set-server = utf8mb4
+collation-server = utf8mb4_unicode_ci
+bind-address = 127.0.0.1
+EOF
+            
+            # Fix any remaining configuration issues
+            sudo dpkg --configure -a 2>/dev/null || true
             
             # Check which MySQL service name is available and start it
             if systemctl list-units --all | grep -q "mysql.service" && systemctl is-enabled mysql >/dev/null 2>&1; then
