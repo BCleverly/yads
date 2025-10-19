@@ -215,7 +215,63 @@ main() {
     test_docker_functionality
     echo
     
+    test_no_sudo_commands
+    echo
+    
     show_test_summary
+}
+
+# Test no-sudo commands
+test_no_sudo_commands() {
+    info "🧪 Testing No-Sudo Commands"
+    echo "============================"
+    
+    local tests_passed=0
+    local tests_total=0
+    
+    # Test yads tunnel setup (should work without sudo now)
+    ((tests_total++))
+    if test_command "yads tunnel setup" "yads tunnel setup command"; then
+        ((tests_passed++))
+    fi
+    
+    # Test yads vscode setup (should work without sudo now)
+    ((tests_total++))
+    if test_command "yads vscode setup" "yads vscode setup command"; then
+        ((tests_passed++))
+    fi
+    
+    # Test yads project creation
+    ((tests_total++))
+    if test_command "yads project test-project" "yads project creation command"; then
+        ((tests_passed++))
+    fi
+    
+    # Test yads service commands
+    ((tests_total++))
+    if test_command "yads start" "yads start command"; then
+        ((tests_passed++))
+    fi
+    
+    ((tests_total++))
+    if test_command "yads stop" "yads stop command"; then
+        ((tests_passed++))
+    fi
+    
+    ((tests_total++))
+    if test_command "yads restart" "yads restart command"; then
+        ((tests_passed++))
+    fi
+    
+    echo
+    info "No-Sudo Commands: $tests_passed/$tests_total passed"
+    echo
+    
+    if [[ $tests_passed -eq $tests_total ]]; then
+        success "🎉 All no-sudo commands are working correctly!"
+    else
+        warning "⚠️  Some no-sudo commands failed. Check permission fixes."
+    fi
 }
 
 # Run main function
