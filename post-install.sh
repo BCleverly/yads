@@ -72,9 +72,19 @@ check_commands() {
 fix_current_session() {
     info "🔧 Fixing PATH for current session..."
     
+    # Determine user's home directory (handle sudo case)
+    local user_home=""
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        # Running with sudo, use the original user's home
+        user_home="/home/$SUDO_USER"
+    else
+        # Running as regular user
+        user_home="$HOME"
+    fi
+    
     # Add to current session PATH
-    export PATH="$HOME/.local/bin:$PATH"
-    export PATH="$HOME/.cursor/bin:$PATH"
+    export PATH="$user_home/.local/bin:$PATH"
+    export PATH="$user_home/.cursor/bin:$PATH"
     export PATH="/usr/local/bin:$PATH"
     
     success "PATH updated for current session"
@@ -84,17 +94,27 @@ fix_current_session() {
 update_shell_config() {
     info "📝 Updating shell configuration..."
     
+    # Determine user's home directory (handle sudo case)
+    local user_home=""
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        # Running with sudo, use the original user's home
+        user_home="/home/$SUDO_USER"
+    else
+        # Running as regular user
+        user_home="$HOME"
+    fi
+    
     local shell_config=""
     if [[ -n "${ZSH_VERSION:-}" ]]; then
-        shell_config="$HOME/.zshrc"
+        shell_config="$user_home/.zshrc"
     else
-        shell_config="$HOME/.bashrc"
+        shell_config="$user_home/.bashrc"
     fi
     
     # Add YADS and Cursor paths
     if ! grep -q "yads" "$shell_config" 2>/dev/null; then
-        echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$shell_config"
-        echo 'export PATH="$HOME/.cursor/bin:$PATH"' >> "$shell_config"
+        echo "export PATH=\"$user_home/.local/bin:\$PATH\"" >> "$shell_config"
+        echo "export PATH=\"$user_home/.cursor/bin:\$PATH\"" >> "$shell_config"
         echo 'export PATH="/usr/local/bin:$PATH"' >> "$shell_config"
         success "Added paths to $shell_config"
     else
@@ -148,7 +168,13 @@ verify_path_comprehensive() {
         warning "cursor-agent command not found"
         
         # Try multiple Cursor paths
-        local cursor_paths=("$HOME/.cursor/bin" "/usr/local/bin")
+        local user_home=""
+        if [[ -n "${SUDO_USER:-}" ]]; then
+            user_home="/home/$SUDO_USER"
+        else
+            user_home="$HOME"
+        fi
+        local cursor_paths=("$user_home/.cursor/bin" "/usr/local/bin")
         for cursor_path in "${cursor_paths[@]}"; do
             if [[ -f "$cursor_path/cursor-agent" ]]; then
                 export PATH="$cursor_path:$PATH"
@@ -164,22 +190,28 @@ verify_path_comprehensive() {
         info "Applying comprehensive PATH fix..."
         
         # Create a comprehensive PATH
-        export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin:$HOME/.cursor/bin:$PATH"
+        local user_home=""
+        if [[ -n "${SUDO_USER:-}" ]]; then
+            user_home="/home/$SUDO_USER"
+        else
+            user_home="$HOME"
+        fi
+        export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$user_home/.local/bin:$user_home/.cursor/bin:$PATH"
         
         # Update shell config with comprehensive PATH
         local shell_config=""
         if [[ -n "${ZSH_VERSION:-}" ]]; then
-            shell_config="$HOME/.zshrc"
+            shell_config="$user_home/.zshrc"
         else
-            shell_config="$HOME/.bashrc"
+            shell_config="$user_home/.bashrc"
         fi
         
         # Add comprehensive PATH to shell config
         if ! grep -q "YADS PATH Configuration" "$shell_config" 2>/dev/null; then
-            cat >> "$shell_config" << 'EOF'
+            cat >> "$shell_config" << EOF
 
 # YADS PATH Configuration
-export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin:$HOME/.cursor/bin:$PATH"
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$user_home/.local/bin:$user_home/.cursor/bin:\$PATH"
 EOF
             info "Added comprehensive PATH to $shell_config"
         fi
