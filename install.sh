@@ -802,6 +802,28 @@ main() {
         chmod +x "$0"
     fi
     
+    # Fix line endings for all scripts
+    info "🔧 Fixing line endings for all scripts..."
+    if [[ -f "$script_dir/fix-all-line-endings.sh" ]]; then
+        chmod +x "$script_dir/fix-all-line-endings.sh"
+        bash "$script_dir/fix-all-line-endings.sh"
+    else
+        # Fallback: fix line endings manually
+        warning "fix-all-line-endings.sh not found, using manual fix..."
+        find "$script_dir" -name "*.sh" -o -name "yads" | while read -r file; do
+            if [[ -f "$file" ]]; then
+                # Fix line endings
+                if command -v dos2unix >/dev/null 2>&1; then
+                    dos2unix "$file" 2>/dev/null || true
+                else
+                    sed -i 's/\r$//' "$file" 2>/dev/null || true
+                fi
+                # Make executable
+                chmod +x "$file"
+            fi
+        done
+    fi
+    
     check_root
     detect_os
     
