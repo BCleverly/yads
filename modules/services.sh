@@ -172,13 +172,32 @@ show_service_status() {
     elif [[ "$service" == "mysql" ]] && systemctl list-unit-files | grep -q "^mysqld.service"; then
         service_exists=true
         actual_service="mysqld"
+    elif [[ "$service" == "cloudflared" ]] && command -v cloudflared >/dev/null 2>&1; then
+        # Cloudflared is installed as binary, check if service exists
+        if systemctl list-unit-files | grep -q "^cloudflared.service"; then
+            service_exists=true
+            actual_service="cloudflared"
+        else
+            # Cloudflared binary exists but no service - show as installed but not running
+            service_exists=true
+            actual_service="cloudflared"
+        fi
     fi
     
     if [[ "$service_exists" == true ]]; then
         if systemctl is-active --quiet "$actual_service"; then
             success "$display_name: Running"
         else
-            warning "$display_name: Stopped"
+            # Special case for cloudflared - check if it's installed as binary
+            if [[ "$service" == "cloudflared" ]] && command -v cloudflared >/dev/null 2>&1; then
+                if systemctl list-unit-files | grep -q "^cloudflared.service"; then
+                    warning "$display_name: Stopped"
+                else
+                    info "$display_name: Installed (no service)"
+                fi
+            else
+                warning "$display_name: Stopped"
+            fi
         fi
     else
         info "$display_name: Not installed"
