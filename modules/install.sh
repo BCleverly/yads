@@ -3,54 +3,55 @@
 # Installation module for YADS
 set -euo pipefail
 
-# Detect and remove existing software
-detect_and_remove() {
+# Check existing software and ask user what to do
+check_existing_software() {
     local software="$1"
     local package_name="$2"
+    local version_info=""
     
     info "Checking for existing $software installation..."
     
     case "$software" in
         "php")
             if command -v php &> /dev/null; then
-                warning "PHP is already installed. Removing for clean install..."
-                remove_php
+                version_info=$(php -v | head -n1 | cut -d' ' -f2)
+                handle_existing_software "PHP" "$version_info" "remove_php" "skip_php"
             fi
             ;;
         "mysql")
             if command -v mysql &> /dev/null; then
-                warning "MySQL is already installed. Removing for clean install..."
-                remove_mysql
+                version_info=$(mysql --version | cut -d' ' -f3 | cut -d',' -f1)
+                handle_existing_software "MySQL" "$version_info" "remove_mysql" "skip_mysql"
             fi
             ;;
         "postgresql")
             if command -v psql &> /dev/null; then
-                warning "PostgreSQL is already installed. Removing for clean install..."
-                remove_postgresql
+                version_info=$(psql --version | cut -d' ' -f3)
+                handle_existing_software "PostgreSQL" "$version_info" "remove_postgresql" "skip_postgresql"
             fi
             ;;
         "nginx")
             if command -v nginx &> /dev/null; then
-                warning "NGINX is already installed. Removing for clean install..."
-                remove_nginx
+                version_info=$(nginx -v 2>&1 | cut -d' ' -f3 | cut -d'/' -f2)
+                handle_existing_software "NGINX" "$version_info" "remove_nginx" "skip_nginx"
             fi
             ;;
         "cloudflared")
             if command -v cloudflared &> /dev/null; then
-                warning "Cloudflare tunnel is already installed. Removing for clean install..."
-                remove_cloudflared
+                version_info=$(cloudflared version | head -n1 | cut -d' ' -f3)
+                handle_existing_software "Cloudflare tunnel" "$version_info" "remove_cloudflared" "skip_cloudflared"
             fi
             ;;
         "gh")
             if command -v gh &> /dev/null; then
-                warning "GitHub CLI is already installed. Removing for clean install..."
-                remove_github_cli
+                version_info=$(gh --version | head -n1 | cut -d' ' -f3)
+                handle_existing_software "GitHub CLI" "$version_info" "remove_github_cli" "skip_github_cli"
             fi
             ;;
         "composer")
             if command -v composer &> /dev/null; then
-                warning "Composer is already installed. Removing for clean install..."
-                remove_composer
+                version_info=$(composer --version | cut -d' ' -f3)
+                handle_existing_software "Composer" "$version_info" "remove_composer" "skip_composer"
             fi
             ;;
         "apache2")
@@ -92,6 +93,43 @@ detect_and_remove() {
                     error_exit "Installation cancelled. Apache2/HTTPD will not be removed."
                 fi
             fi
+            ;;
+    esac
+}
+
+# Handle existing software with user choice
+handle_existing_software() {
+    local software_name="$1"
+    local version="$2"
+    local remove_function="$3"
+    local skip_function="$4"
+    
+    echo
+    log "${YELLOW}Found existing $software_name installation${NC}"
+    echo "  Version: $version"
+    echo
+    log "${GREEN}What would you like to do?${NC}"
+    echo "  [r] Remove existing $software_name and install fresh"
+    echo "  [s] Skip $software_name installation (keep existing)"
+    echo "  [c] Cancel installation"
+    echo
+    read -p "Enter your choice [r/s/c]: " choice
+    
+    case "$choice" in
+        "r"|"R")
+            warning "Removing existing $software_name..."
+            $remove_function
+            ;;
+        "s"|"S")
+            info "Skipping $software_name installation (keeping existing)"
+            $skip_function
+            ;;
+        "c"|"C")
+            error_exit "Installation cancelled by user"
+            ;;
+        *)
+            warning "Invalid choice. Skipping $software_name installation."
+            $skip_function
             ;;
     esac
 }
@@ -245,6 +283,42 @@ remove_apache2() {
     success "Apache2/HTTPD removed"
 }
 
+# Skip functions for existing software
+skip_php() {
+    info "Skipping PHP installation (keeping existing)"
+    SKIP_PHP=true
+}
+
+skip_mysql() {
+    info "Skipping MySQL installation (keeping existing)"
+    SKIP_MYSQL=true
+}
+
+skip_postgresql() {
+    info "Skipping PostgreSQL installation (keeping existing)"
+    SKIP_POSTGRESQL=true
+}
+
+skip_nginx() {
+    info "Skipping NGINX installation (keeping existing)"
+    SKIP_NGINX=true
+}
+
+skip_cloudflared() {
+    info "Skipping Cloudflare tunnel installation (keeping existing)"
+    SKIP_CLOUDFLARED=true
+}
+
+skip_github_cli() {
+    info "Skipping GitHub CLI installation (keeping existing)"
+    SKIP_GITHUB_CLI=true
+}
+
+skip_composer() {
+    info "Skipping Composer installation (keeping existing)"
+    SKIP_COMPOSER=true
+}
+
 # Update system packages
 update_system() {
     info "Updating system packages..."
@@ -268,8 +342,13 @@ update_system() {
 
 # Install PHP 8.4
 install_php() {
+    if [[ "${SKIP_PHP:-false}" == "true" ]]; then
+        info "Skipping PHP installation (user chose to keep existing)"
+        return 0
+    fi
+    
     info "Installing PHP 8.4..."
-    detect_and_remove "php" "php"
+    check_existing_software "php" "php"
     
     case "$OS" in
         "ubuntu"|"debian")
@@ -320,8 +399,13 @@ configure_php() {
 
 # Install MySQL
 install_mysql() {
+    if [[ "${SKIP_MYSQL:-false}" == "true" ]]; then
+        info "Skipping MySQL installation (user chose to keep existing)"
+        return 0
+    fi
+    
     info "Installing MySQL..."
-    detect_and_remove "mysql" "mysql"
+    check_existing_software "mysql" "mysql"
     
     case "$OS" in
         "ubuntu"|"debian")
@@ -446,8 +530,13 @@ EOF
 
 # Install PostgreSQL
 install_postgresql() {
+    if [[ "${SKIP_POSTGRESQL:-false}" == "true" ]]; then
+        info "Skipping PostgreSQL installation (user chose to keep existing)"
+        return 0
+    fi
+    
     info "Installing PostgreSQL..."
-    detect_and_remove "postgresql" "postgresql"
+    check_existing_software "postgresql" "postgresql"
     
     case "$OS" in
         "ubuntu"|"debian")
@@ -534,8 +623,13 @@ EOF
 
 # Install Composer
 install_composer() {
+    if [[ "${SKIP_COMPOSER:-false}" == "true" ]]; then
+        info "Skipping Composer installation (user chose to keep existing)"
+        return 0
+    fi
+    
     info "Installing Composer..."
-    detect_and_remove "composer" "composer"
+    check_existing_software "composer" "composer"
     
     # Download and install Composer
     curl -sS https://getcomposer.org/installer | php
@@ -554,8 +648,13 @@ install_composer() {
 
 # Install GitHub CLI
 install_github_cli() {
+    if [[ "${SKIP_GITHUB_CLI:-false}" == "true" ]]; then
+        info "Skipping GitHub CLI installation (user chose to keep existing)"
+        return 0
+    fi
+    
     info "Installing GitHub CLI..."
-    detect_and_remove "gh" "github-cli"
+    check_existing_software "gh" "github-cli"
     
     case "$OS" in
         "ubuntu"|"debian")
@@ -587,8 +686,13 @@ install_cursor_cli() {
 
 # Install Cloudflare tunnel
 install_cloudflared() {
+    if [[ "${SKIP_CLOUDFLARED:-false}" == "true" ]]; then
+        info "Skipping Cloudflare tunnel installation (user chose to keep existing)"
+        return 0
+    fi
+    
     info "Installing Cloudflare tunnel..."
-    detect_and_remove "cloudflared" "cloudflared"
+    check_existing_software "cloudflared" "cloudflared"
     
     # Download and install cloudflared
     wget -O cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
@@ -648,8 +752,13 @@ choose_web_server() {
 
 # Install NGINX
 install_nginx() {
+    if [[ "${SKIP_NGINX:-false}" == "true" ]]; then
+        info "Skipping NGINX installation (user chose to keep existing)"
+        return 0
+    fi
+    
     info "Installing NGINX..."
-    detect_and_remove "nginx" "nginx"
+    check_existing_software "nginx" "nginx"
     
     case "$OS" in
         "ubuntu"|"debian")
@@ -1041,7 +1150,7 @@ install_all() {
     
     # Check for conflicting web servers
     info "Step 10/10: Checking for conflicting web servers..."
-    detect_and_remove "apache2" "apache2"
+    check_existing_software "apache2" "apache2"
     
     # Choose and install web server
     info "Installing web server..."
