@@ -177,9 +177,9 @@ install_nodejs() {
     
     # Install latest LTS Node.js
     info "Installing latest LTS Node.js..."
-    nvm install --lts
-    nvm use --lts
-    nvm alias default lts/*
+    nvm install --lts || nvm install node
+    nvm use --lts || nvm use node
+    nvm alias default lts/* || nvm alias default node
     
     # Verify installation
     local node_version=$(node --version)
@@ -242,9 +242,9 @@ install_vscode_server() {
         export NVM_DIR="/opt/vscode-server/.nvm"
         curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-        nvm install --lts
-        nvm use --lts
-    '
+        nvm install --lts || nvm install node
+        nvm use --lts || nvm use node
+    ' || warning "NVM setup for vscode user had issues, but continuing..."
     
     # Download and install VS Code Server
     local latest_version
