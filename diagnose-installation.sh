@@ -286,8 +286,51 @@ check_services() {
     
     if ! command -v cursor-agent >/dev/null 2>&1; then
         warning "cursor-agent command not found"
+        
+        # Check if it exists in common locations
+        local cursor_paths=("$HOME/.cursor/bin/cursor-agent" "/usr/local/bin/cursor-agent" "/usr/bin/cursor-agent")
+        local found_cursor=false
+        
+        for cursor_path in "${cursor_paths[@]}"; do
+            if [[ -f "$cursor_path" ]]; then
+                warning "Found cursor-agent at: $cursor_path (not in PATH)"
+                found_cursor=true
+                
+                # Check if it's executable
+                if [[ -x "$cursor_path" ]]; then
+                    info "  cursor-agent is executable"
+                else
+                    warning "  cursor-agent is not executable"
+                fi
+                
+                # Check if it's a symlink
+                if [[ -L "$cursor_path" ]]; then
+                    info "  cursor-agent is a symlink to: $(readlink "$cursor_path")"
+                fi
+            fi
+        done
+        
+        if [[ "$found_cursor" == false ]]; then
+            warning "cursor-agent not found in common locations"
+            info "  Searched: $HOME/.cursor/bin/, /usr/local/bin/, /usr/bin/"
+        fi
+        
+        # Check if Cursor CLI was installed
+        if [[ -d "$HOME/.cursor" ]]; then
+            info "Cursor CLI directory exists: $HOME/.cursor"
+            if [[ -d "$HOME/.cursor/bin" ]]; then
+                info "Cursor bin directory exists: $HOME/.cursor/bin"
+                info "Contents: $(ls -la "$HOME/.cursor/bin/" 2>/dev/null || echo 'empty')"
+            else
+                warning "Cursor bin directory not found"
+            fi
+        else
+            warning "Cursor CLI not installed (no ~/.cursor directory)"
+        fi
+        
         echo "  Try: source ~/.bashrc"
         echo "  Or: export PATH=\"\$HOME/.cursor/bin:\$PATH\""
+        echo "  Or: ./fix-cursor-agent.sh"
         echo
     fi
     
