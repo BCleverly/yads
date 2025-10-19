@@ -405,24 +405,37 @@ create_yads_structure() {
     
     local yads_dir="/opt/yads"
     local projects_dir="/var/www/projects"
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     
     mkdir -p "$yads_dir"/{modules,config,logs}
     mkdir -p "$projects_dir"
     mkdir -p /etc/yads
     
-    # Copy modules
-    cp -r modules/* "$yads_dir/modules/"
-    chmod +x "$yads_dir/modules"/*.sh
+    # Copy modules from script directory
+    if [[ -d "$script_dir/modules" ]]; then
+        cp -r "$script_dir/modules"/* "$yads_dir/modules/"
+        chmod +x "$yads_dir/modules"/*.sh
+    else
+        error_exit "Modules directory not found at $script_dir/modules"
+    fi
     
     # Create main yads script
-    cp yads "$yads_dir/"
-    chmod +x "$yads_dir/yads"
+    if [[ -f "$script_dir/yads" ]]; then
+        cp "$script_dir/yads" "$yads_dir/"
+        chmod +x "$yads_dir/yads"
+    else
+        error_exit "Main yads script not found at $script_dir/yads"
+    fi
     
     # Create symlink
     ln -sf "$yads_dir/yads" /usr/local/bin/yads
     
     # Create version file
-    echo "1.0.0" > "$yads_dir/version"
+    if [[ -f "$script_dir/version" ]]; then
+        cp "$script_dir/version" "$yads_dir/"
+    else
+        echo "1.0.0" > "$yads_dir/version"
+    fi
     
     success "YADS structure created"
 }
@@ -454,6 +467,12 @@ main() {
     
     log "${CYAN}🚀 YADS - Remote PHP Development Server Installation${NC}"
     log "${BLUE}================================================${NC}"
+    
+    # Check if we're in the right directory
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [[ ! -f "$script_dir/yads" ]] || [[ ! -d "$script_dir/modules" ]]; then
+        error_exit "Please run this script from the YADS repository directory"
+    fi
     
     check_root
     detect_os

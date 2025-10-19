@@ -64,12 +64,9 @@ install_yads() {
     # Check for existing installation
     check_existing_installation
     
-    # Run the main install script
-    if [[ -f "$(dirname "$0")/../install.sh" ]]; then
-        bash "$(dirname "$0")/../install.sh"
-    else
-        error_exit "Install script not found"
-    fi
+    # This module is called from the main install script
+    # No need to call external script
+    info "Installation module loaded successfully"
 }
 
 # Main install function
