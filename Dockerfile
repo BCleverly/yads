@@ -85,7 +85,9 @@ echo "  yads database mysql"
 echo
 EOF
 
-RUN chmod +x /home/yadsuser/test-yads.sh
+# Fix line endings and make executable
+RUN sed -i 's/\r$//' /home/yadsuser/test-yads.sh && \
+    chmod +x /home/yadsuser/test-yads.sh
 
 # Switch to non-root user
 USER yadsuser
@@ -130,7 +132,10 @@ echo
 tail -f /dev/null
 EOF
 
-RUN chmod +x /home/yadsuser/entrypoint.sh
+# Fix line endings and make executable
+RUN sed -i 's/\r$//' /home/yadsuser/entrypoint.sh && \
+    chmod +x /home/yadsuser/entrypoint.sh && \
+    ls -la /home/yadsuser/entrypoint.sh
 
 # Set entrypoint
-ENTRYPOINT ["/home/yadsuser/entrypoint.sh"]
+ENTRYPOINT ["/bin/bash", "/home/yadsuser/entrypoint.sh"]
