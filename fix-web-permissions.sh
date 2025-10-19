@@ -61,7 +61,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # Get the development user
-local dev_user=""
+dev_user=""
 if [[ -n "${SUDO_USER:-}" ]]; then
     dev_user="$SUDO_USER"
 else
