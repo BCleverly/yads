@@ -5,8 +5,20 @@
 
 set -euo pipefail
 
-# Script directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Script directory - handle symlinks properly
+get_script_dir() {
+    local source="${BASH_SOURCE[0]}"
+    while [[ -L "$source" ]]; do
+        local dir="$(cd -P "$(dirname "$source")" && pwd)"
+        source="$(readlink "$source")"
+        if [[ "$source" != /* ]]; then
+            source="$dir/$source"
+        fi
+    done
+    echo "$(cd -P "$(dirname "$source")" && pwd)"
+}
+
+SCRIPT_DIR="$(get_script_dir)"
 MODULES_DIR="${SCRIPT_DIR}/modules"
 
 # Color setup
@@ -92,6 +104,14 @@ check_module() {
     fi
 }
 
+# Debug function to show paths
+debug_paths() {
+    echo "Script directory: $SCRIPT_DIR"
+    echo "Modules directory: $MODULES_DIR"
+    echo "Available modules:"
+    ls -la "$MODULES_DIR" 2>/dev/null || echo "Modules directory not found"
+}
+
 # Source module with error handling
 source_module() {
     local module="$1"
@@ -156,6 +176,10 @@ main() {
             ;;
         --test-colors)
             echo -e "${RED}Red${NC} ${GREEN}Green${NC} ${YELLOW}Yellow${NC} ${BLUE}Blue${NC} ${CYAN}Cyan${NC}"
+            exit 0
+            ;;
+        --debug-paths)
+            debug_paths
             exit 0
             ;;
         "")
