@@ -11,7 +11,8 @@ MODULES_DIR="${SCRIPT_DIR}/modules"
 
 # Color setup
 setup_colors() {
-    if [[ -t 2 ]] && [[ -z "${NO_COLOR-}" ]] && [[ "${TERM-}" != "dumb" ]]; then
+    # Check if we have a terminal and colors are supported
+    if [[ -t 1 ]] && [[ -t 2 ]] && [[ -z "${NO_COLOR-}" ]] && [[ "${TERM-}" != "dumb" ]] && [[ "${TERM-}" != "unknown" ]]; then
         RED='\033[0;31m'
         GREEN='\033[0;32m'
         YELLOW='\033[1;33m'
@@ -100,45 +101,43 @@ source_module() {
 
 # Show help
 show_help() {
-    cat << EOF
-${CYAN}YADS - Yet Another Development Server${NC}
-${BLUE}Remote PHP Web Development Server with Cloudflared Tunnels${NC}
-
-${YELLOW}Usage:${NC}
-  yads <command> [options]
-
-${YELLOW}Commands:${NC}
-  install                 Install YADS development server
-  uninstall               Uninstall YADS (preserves SSH keys)
-  start                   Start all services
-  stop                    Stop all services
-  restart                 Restart all services
-  status                  Show service status
-  php <version>           Install specific PHP version (5.6-8.5)
-  server <type>           Switch web server (apache|nginx|frankenphp)
-  database <type>         Install database (mysql|postgresql)
-  tunnel                  Configure Cloudflared tunnel
-  vscode                  Configure VS Code Server
-  project <name>          Create new project
-  help                    Show this help message
-  version                 Show version information
-
-${YELLOW}Examples:${NC}
-  yads install                    # Install complete development server
-  yads php 8.2                    # Install PHP 8.2
-  yads server nginx               # Switch to Nginx
-  yads database mysql             # Install MySQL
-  yads project myapp              # Create new project 'myapp'
-  yads tunnel setup               # Setup Cloudflared tunnel
-
-${YELLOW}Prerequisites:${NC}
-  - Ubuntu/Debian/CentOS/RHEL/Fedora/Arch Linux
-  - Root or sudo access
-  - Internet connection
-  - Cloudflare account (for tunnels)
-
-${YELLOW}Version:${NC} $(get_version)
-EOF
+    echo -e "${CYAN}YADS - Yet Another Development Server${NC}"
+    echo -e "${BLUE}Remote PHP Web Development Server with Cloudflared Tunnels${NC}"
+    echo
+    echo -e "${YELLOW}Usage:${NC}"
+    echo "  yads <command> [options]"
+    echo
+    echo -e "${YELLOW}Commands:${NC}"
+    echo "  install                 Install YADS development server"
+    echo "  uninstall               Uninstall YADS (preserves SSH keys)"
+    echo "  start                   Start all services"
+    echo "  stop                    Stop all services"
+    echo "  restart                 Restart all services"
+    echo "  status                  Show service status"
+    echo "  php <version>           Install specific PHP version (5.6-8.5)"
+    echo "  server <type>           Switch web server (apache|nginx|frankenphp)"
+    echo "  database <type>         Install database (mysql|postgresql)"
+    echo "  tunnel                  Configure Cloudflared tunnel"
+    echo "  vscode                  Configure VS Code Server"
+    echo "  project <name>          Create new project"
+    echo "  help                    Show this help message"
+    echo "  version                 Show version information"
+    echo
+    echo -e "${YELLOW}Examples:${NC}"
+    echo "  yads install                    # Install complete development server"
+    echo "  yads php 8.2                    # Install PHP 8.2"
+    echo "  yads server nginx               # Switch to Nginx"
+    echo "  yads database mysql             # Install MySQL"
+    echo "  yads project myapp              # Create new project 'myapp'"
+    echo "  yads tunnel setup               # Setup Cloudflared tunnel"
+    echo
+    echo -e "${YELLOW}Prerequisites:${NC}"
+    echo "  - Ubuntu/Debian/CentOS/RHEL/Fedora/Arch Linux"
+    echo "  - Root or sudo access"
+    echo "  - Internet connection"
+    echo "  - Cloudflare account (for tunnels)"
+    echo
+    echo -e "${YELLOW}Version:${NC} $(get_version)"
 }
 
 # Main command handler
@@ -153,6 +152,10 @@ main() {
             ;;
         -v|--version|version)
             echo "YADS $(get_version)"
+            exit 0
+            ;;
+        --test-colors)
+            echo -e "${RED}Red${NC} ${GREEN}Green${NC} ${YELLOW}Yellow${NC} ${BLUE}Blue${NC} ${CYAN}Cyan${NC}"
             exit 0
             ;;
         "")
