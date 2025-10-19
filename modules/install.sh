@@ -116,7 +116,11 @@ remove_php() {
 remove_mysql() {
     case "$OS" in
         "ubuntu"|"debian")
-            sudo systemctl stop mysql || true
+            # Stop both possible MySQL service names
+            sudo systemctl stop mysql 2>/dev/null || true
+            sudo systemctl stop mysqld 2>/dev/null || true
+            sudo pkill -f mysql 2>/dev/null || true
+            
             sudo apt-get remove --purge -y mysql-server mysql-client mysql-common mysql-server-core-* mysql-client-core-* || true
             sudo apt-get autoremove -y || true
             sudo apt-get autoclean || true
@@ -321,20 +325,74 @@ install_mysql() {
     case "$OS" in
         "ubuntu"|"debian")
             sudo apt-get install -y mysql-server mysql-client
-            sudo systemctl start mysql
-            sudo systemctl enable mysql
+            
+            # Check which MySQL service name is available and start it
+            if systemctl list-units --all | grep -q "mysql.service" && systemctl is-enabled mysql >/dev/null 2>&1; then
+                sudo systemctl start mysql
+                sudo systemctl enable mysql
+                MYSQL_SERVICE="mysql"
+            elif systemctl list-units --all | grep -q "mysqld.service" && systemctl is-enabled mysqld >/dev/null 2>&1; then
+                sudo systemctl start mysqld
+                sudo systemctl enable mysqld
+                MYSQL_SERVICE="mysqld"
+            else
+                # Try to start MySQL manually and detect the correct service name
+                if sudo systemctl start mysql 2>/dev/null; then
+                    sudo systemctl enable mysql
+                    MYSQL_SERVICE="mysql"
+                elif sudo systemctl start mysqld 2>/dev/null; then
+                    sudo systemctl enable mysqld
+                    MYSQL_SERVICE="mysqld"
+                else
+                    # Last resort: try to start MySQL daemon directly
+                    info "Attempting to start MySQL daemon directly..."
+                    sudo mysqld_safe --user=mysql --skip-grant-tables --skip-networking &
+                    sleep 5
+                    MYSQL_SERVICE="mysql"
+                fi
+                
+                # If MySQL still fails, offer MariaDB as alternative
+                if ! mysql -u root -e "SELECT 1;" >/dev/null 2>&1; then
+                    warning "MySQL installation failed. Installing MariaDB as alternative..."
+                    sudo apt-get remove --purge -y mysql-server mysql-client 2>/dev/null || true
+                    sudo apt-get install -y mariadb-server mariadb-client
+                    sudo systemctl start mariadb
+                    sudo systemctl enable mariadb
+                    MYSQL_SERVICE="mariadb"
+                fi
+            fi
             ;;
         "centos"|"rhel"|"fedora")
             sudo dnf install -y mysql-server mysql
             sudo systemctl start mysqld
             sudo systemctl enable mysqld
+            MYSQL_SERVICE="mysqld"
             ;;
         "arch")
             sudo pacman -S --noconfirm mysql
             sudo systemctl start mysqld
             sudo systemctl enable mysqld
+            MYSQL_SERVICE="mysqld"
             ;;
     esac
+    
+    # Wait for MySQL to be ready
+    info "Waiting for MySQL to be ready..."
+    local max_attempts=30
+    local attempt=0
+    while [[ $attempt -lt $max_attempts ]]; do
+        if mysql -u root -e "SELECT 1;" >/dev/null 2>&1; then
+            success "MySQL is ready"
+            break
+        fi
+        sleep 2
+        ((attempt++))
+        info "Waiting for MySQL... (attempt $attempt/$max_attempts)"
+    done
+    
+    if [[ $attempt -eq $max_attempts ]]; then
+        warning "MySQL may not be fully ready, but continuing with configuration..."
+    fi
     
     # Secure MySQL installation
     secure_mysql
@@ -364,8 +422,12 @@ tmp_table_size = 64M
 max_heap_table_size = 64M
 EOF
     
-    # Restart MySQL
-    sudo systemctl restart mysql || sudo systemctl restart mysqld
+    # Restart MySQL using the detected service name
+    if [[ -n "${MYSQL_SERVICE:-}" ]]; then
+        sudo systemctl restart "$MYSQL_SERVICE"
+    else
+        sudo systemctl restart mysql || sudo systemctl restart mysqld
+    fi
     
     # Run mysql_secure_installation
     sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$MYSQL_ROOT_PASSWORD';"
