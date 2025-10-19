@@ -29,6 +29,9 @@ git clone https://github.com/BCleverly/yads.git && cd yads && chmod +x setup.sh 
 
 # Or make yads available locally first (for development)
 git clone https://github.com/BCleverly/yads.git && cd yads && chmod +x local-setup.sh && ./local-setup.sh
+
+# If you get "cannot execute: required file not found" error, fix line endings first:
+git clone https://github.com/BCleverly/yads.git && cd yads && chmod +x fix-line-endings.sh && ./fix-line-endings.sh && ./local-setup.sh
 ```
 
 ### Basic Usage

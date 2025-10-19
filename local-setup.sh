@@ -55,8 +55,17 @@ main() {
         exit 1
     fi
     
-    # Make scripts executable
-    info "Setting executable permissions..."
+    # Make scripts executable and fix line endings
+    info "Setting executable permissions and fixing line endings..."
+    
+    # Fix line endings for yads script
+    if command -v dos2unix >/dev/null 2>&1; then
+        dos2unix "$script_dir/yads" 2>/dev/null || true
+    else
+        # Fallback: use sed to convert CRLF to LF
+        sed -i 's/\r$//' "$script_dir/yads" 2>/dev/null || true
+    fi
+    
     chmod +x "$script_dir/yads"
     chmod +x "$script_dir/install.sh"
     chmod +x "$script_dir/manual-uninstall.sh"
@@ -73,6 +82,15 @@ main() {
     fi
     
     ln -sf "$script_dir/yads" "$local_bin/yads"
+    
+    # Verify the symlink works
+    if [[ -x "$local_bin/yads" ]]; then
+        success "yads symlink created and is executable"
+    else
+        warning "yads symlink created but may not be executable"
+        info "Checking file permissions..."
+        ls -la "$local_bin/yads"
+    fi
     
     # Add to PATH if not already there
     local shell_config=""
