@@ -168,15 +168,21 @@ update_shell_config() {
     # Check if PATH is already configured
     if grep -q "~/.local/bin" "$shell_config" 2>/dev/null; then
         info "PATH already configured in $shell_config"
-        return
+    else
+        # Add to PATH
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$shell_config"
+        success "Added ~/.local/bin to PATH in $shell_config"
     fi
     
-    # Add to PATH
-    echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$shell_config"
-    success "Added ~/.local/bin to PATH in $shell_config"
+    # Ensure Cursor Agent is in PATH
+    if ! grep -q "cursor-agent" "$shell_config" 2>/dev/null; then
+        echo 'export PATH="$HOME/.cursor/bin:$PATH"' >> "$shell_config"
+        info "Added Cursor Agent to PATH in $shell_config"
+    fi
     
     # Source the config for current session
     export PATH="$HOME/.local/bin:$PATH"
+    export PATH="$HOME/.cursor/bin:$PATH"
     info "PATH updated for current session"
 }
 

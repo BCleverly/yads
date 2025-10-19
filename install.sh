@@ -491,6 +491,40 @@ install_cursor_cli() {
         fi
     fi
     
+    # Ensure cursor-agent is ready and waiting on CLI
+    info "🎯 Setting up Cursor Agent for CLI use..."
+    
+    # Add to user's shell configuration
+    local shell_config=""
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
+        shell_config="$HOME/.zshrc"
+    else
+        shell_config="$HOME/.bashrc"
+    fi
+    
+    # Add Cursor Agent to PATH in shell config
+    if ! grep -q "cursor-agent" "$shell_config" 2>/dev/null; then
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$shell_config"
+        echo 'export PATH="$HOME/.cursor/bin:$PATH"' >> "$shell_config"
+        info "Added Cursor Agent to PATH in $shell_config"
+    fi
+    
+    # Create a symlink in /usr/local/bin for system-wide access
+    if [[ -f "$HOME/.cursor/bin/cursor-agent" ]]; then
+        ln -sf "$HOME/.cursor/bin/cursor-agent" /usr/local/bin/cursor-agent
+        chmod +x /usr/local/bin/cursor-agent
+        info "Created system-wide symlink for cursor-agent"
+    fi
+    
+    # Test cursor-agent availability
+    if command -v cursor-agent >/dev/null 2>&1; then
+        success "Cursor Agent is ready and available on CLI"
+        info "You can now use: cursor-agent"
+    else
+        warning "Cursor Agent may need a shell restart to be available"
+        info "Run: source $shell_config"
+    fi
+    
     success "Cursor CLI installed"
 }
 
