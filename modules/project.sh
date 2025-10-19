@@ -69,9 +69,17 @@ create_project() {
         error_exit "Project '$project_name' already exists"
     fi
     
-    # Create project directory
-    mkdir -p "$project_dir"
-    cd "$project_dir"
+    # Create project directory with proper permissions
+    if [[ $EUID -eq 0 ]]; then
+        # Running as root
+        mkdir -p "$project_dir"
+        cd "$project_dir"
+    else
+        # Running as regular user, use sudo
+        sudo mkdir -p "$project_dir"
+        sudo chown "$USER:$USER" "$project_dir"
+        cd "$project_dir"
+    fi
     
     case "$project_type" in
         php)

@@ -115,8 +115,10 @@ EOF
 configure_nginx() {
     info "🌐 Configuring Nginx..."
     
-    # Create main Nginx configuration
-    cat > /etc/nginx/sites-available/yads << 'EOF'
+    # Create main Nginx configuration with proper permissions
+    if [[ $EUID -eq 0 ]]; then
+        # Running as root
+        cat > /etc/nginx/sites-available/yads << 'EOF'
 server {
     listen 80;
     server_name localhost *.localhost;
@@ -146,17 +148,61 @@ server {
     }
 }
 EOF
+    else
+        # Running as regular user, use sudo
+        sudo tee /etc/nginx/sites-available/yads > /dev/null << 'EOF'
+server {
+    listen 80;
+    server_name localhost *.localhost;
+    root /var/www/projects;
+    index index.php index.html index.htm;
+    
+    # Enable PHP processing
+    location / {
+        try_files $uri $uri/ =404;
+    }
+    
+    # PHP processing
+    location ~ \.php$ {
+        fastcgi_pass unix:/var/run/php/php8.4-fpm.sock;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+}
+EOF
+    fi
     
     # Enable the site
-    ln -sf /etc/nginx/sites-available/yads /etc/nginx/sites-enabled/
-    rm -f /etc/nginx/sites-enabled/default
+    if [[ $EUID -eq 0 ]]; then
+        # Running as root
+        ln -sf /etc/nginx/sites-available/yads /etc/nginx/sites-enabled/
+        rm -f /etc/nginx/sites-enabled/default
+    else
+        # Running as regular user, use sudo
+        sudo ln -sf /etc/nginx/sites-available/yads /etc/nginx/sites-enabled/
+        sudo rm -f /etc/nginx/sites-enabled/default
+    fi
     
     # Test configuration
-    nginx -t
+    if [[ $EUID -eq 0 ]]; then
+        # Running as root
+        nginx -t
+    else
+        # Running as regular user, use sudo
+        sudo nginx -t
+    fi
     
     # Start Nginx
-    systemctl restart nginx
-    systemctl enable nginx
+    if [[ $EUID -eq 0 ]]; then
+        # Running as root
+        systemctl restart nginx
+        systemctl enable nginx
+    else
+        # Running as regular user, use sudo
+        sudo systemctl restart nginx
+        sudo systemctl enable nginx
+    fi
     
     success "Nginx configured"
 }
