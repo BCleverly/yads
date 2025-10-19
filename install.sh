@@ -152,35 +152,72 @@ install_docker() {
     success "Docker installed and started"
 }
 
-# Install Node.js and npm
+# Install NVM and Node.js
 install_nodejs() {
-    info "📦 Installing Node.js and npm..."
+    info "📦 Installing NVM and Node.js..."
     
-    if command -v node >/dev/null 2>&1; then
-        info "Node.js already installed"
-        return
+    # Check if NVM is already installed
+    if [[ -d "$HOME/.nvm" ]] && command -v nvm >/dev/null 2>&1; then
+        info "NVM already installed"
+        # Source NVM to make it available
+        source "$HOME/.nvm/nvm.sh"
+    else
+        info "Installing NVM..."
+        
+        # Install NVM using the official installer
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+        
+        # Source NVM to make it available in current session
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+        
+        success "NVM installed successfully"
     fi
     
-    # Install NodeSource repository
-    curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
+    # Install latest LTS Node.js
+    info "Installing latest LTS Node.js..."
+    nvm install --lts
+    nvm use --lts
+    nvm alias default lts/*
     
-    case "$OS" in
-        ubuntu|debian)
-            apt-get install -y nodejs
-            ;;
-        centos|rhel|fedora)
-            if command -v dnf >/dev/null 2>&1; then
-                dnf install -y nodejs npm
-            else
-                yum install -y nodejs npm
-            fi
-            ;;
-        arch)
-            pacman -S --noconfirm nodejs npm
-            ;;
-    esac
+    # Verify installation
+    local node_version=$(node --version)
+    local npm_version=$(npm --version)
     
-    success "Node.js and npm installed"
+    success "Node.js $node_version and npm $npm_version installed"
+    
+    # Install global packages useful for development
+    info "Installing global npm packages..."
+    npm install -g yarn pnpm
+    
+    # Add NVM to shell configuration
+    local shell_config=""
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
+        shell_config="$HOME/.zshrc"
+    else
+        shell_config="$HOME/.bashrc"
+    fi
+    
+    # Add NVM to shell config if not already there
+    if ! grep -q "NVM_DIR" "$shell_config" 2>/dev/null; then
+        cat >> "$shell_config" << 'EOF'
+
+# NVM Configuration
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+EOF
+        info "Added NVM to $shell_config"
+    fi
+    
+    # Create symlinks for system-wide access
+    ln -sf "$(which node)" /usr/local/bin/node
+    ln -sf "$(which npm)" /usr/local/bin/npm
+    ln -sf "$(which yarn)" /usr/local/bin/yarn 2>/dev/null || true
+    ln -sf "$(which pnpm)" /usr/local/bin/pnpm 2>/dev/null || true
+    
+    success "Node.js ecosystem installed and configured"
 }
 
 # Install VS Code Server
@@ -198,6 +235,16 @@ install_vscode_server() {
     # Create vscode directory
     mkdir -p "$vscode_dir"
     chown -R "$vscode_user:$vscode_user" "$vscode_dir"
+    
+    # Ensure NVM is available for vscode user
+    info "Setting up NVM for vscode user..."
+    sudo -u "$vscode_user" bash -c '
+        export NVM_DIR="/opt/vscode-server/.nvm"
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        nvm install --lts
+        nvm use --lts
+    '
     
     # Download and install VS Code Server
     local latest_version
@@ -691,7 +738,7 @@ verify_and_fix_path() {
     fi
     
     # Check if other important commands are available
-    local important_commands=("composer" "php" "git")
+    local important_commands=("composer" "php" "git" "node" "npm" "nvm")
     for cmd in "${important_commands[@]}"; do
         if ! command -v "$cmd" >/dev/null 2>&1; then
             warning "$cmd command not found in PATH"

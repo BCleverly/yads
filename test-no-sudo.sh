@@ -241,6 +241,24 @@ test_command_availability() {
         ((tests_passed++))
     fi
     
+    # Test node command
+    ((tests_total++))
+    if test_command "command -v node" "node command availability"; then
+        ((tests_passed++))
+    fi
+    
+    # Test npm command
+    ((tests_total++))
+    if test_command "command -v npm" "npm command availability"; then
+        ((tests_passed++))
+    fi
+    
+    # Test nvm command
+    ((tests_total++))
+    if test_command "command -v nvm" "nvm command availability"; then
+        ((tests_passed++))
+    fi
+    
     echo
     info "Command Availability: $tests_passed/$tests_total passed"
     echo
