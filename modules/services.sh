@@ -153,8 +153,28 @@ show_service_status() {
     local service="$1"
     local display_name="$2"
     
+    # Check if service exists (handle different service names)
+    local service_exists=false
+    local actual_service=""
+    
+    # Check for exact service name first
     if systemctl list-unit-files | grep -q "^$service.service"; then
-        if systemctl is-active --quiet "$service"; then
+        service_exists=true
+        actual_service="$service"
+    # Check for alternative service names
+    elif [[ "$service" == "apache2" ]] && systemctl list-unit-files | grep -q "^apache2.service"; then
+        service_exists=true
+        actual_service="apache2"
+    elif [[ "$service" == "apache2" ]] && systemctl list-unit-files | grep -q "^httpd.service"; then
+        service_exists=true
+        actual_service="httpd"
+    elif [[ "$service" == "mysql" ]] && systemctl list-unit-files | grep -q "^mysqld.service"; then
+        service_exists=true
+        actual_service="mysqld"
+    fi
+    
+    if [[ "$service_exists" == true ]]; then
+        if systemctl is-active --quiet "$actual_service"; then
             success "$display_name: Running"
         else
             warning "$display_name: Stopped"
@@ -178,13 +198,15 @@ show_access_info() {
         fi
     fi
     
-    # Web server
-    if systemctl is-active --quiet apache2; then
+    # Web server - check which one is actually running
+    if systemctl is-active --quiet apache2 || systemctl is-active --quiet httpd; then
         info "Web Server: Apache2 running on port 80"
     elif systemctl is-active --quiet nginx; then
         info "Web Server: Nginx running on port 80"
     elif systemctl is-active --quiet frankenphp; then
         info "Web Server: FrankenPHP running on port 80"
+    else
+        info "Web Server: No web server detected as running"
     fi
     
     # Projects
