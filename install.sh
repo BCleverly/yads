@@ -417,8 +417,8 @@ install_databases() {
     esac
     
     # Start and enable services
-    systemctl start mysql redis
-    systemctl enable mysql redis
+    systemctl start mysql redis-server
+    systemctl enable mysql redis-server
     
     # Initialize PostgreSQL
     if [[ "$OS" == "arch" ]]; then

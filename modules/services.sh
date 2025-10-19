@@ -56,7 +56,7 @@ YADS_SERVICES=(
     "cloudflared"
     "mysql"
     "postgresql"
-    "redis"
+    "redis-server"
     "apache2"
     "nginx"
     "frankenphp"
@@ -141,7 +141,7 @@ show_status() {
     log "${WHITE}Databases:${NC}"
     show_service_status "mysql" "MySQL"
     show_service_status "postgresql" "PostgreSQL"
-    show_service_status "redis" "Redis"
+    show_service_status "redis-server" "Redis"
     echo
     
     # Show access information
