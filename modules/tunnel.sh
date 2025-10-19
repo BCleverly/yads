@@ -64,9 +64,20 @@ setup_tunnel() {
     
     check_cloudflared
     
-    # Create cloudflared directory
-    mkdir -p /etc/cloudflared
-    mkdir -p /var/log/cloudflared
+    # Create cloudflared directory with proper permissions
+    info "📁 Creating Cloudflared directories..."
+    if [[ $EUID -eq 0 ]]; then
+        # Running as root
+        mkdir -p /etc/cloudflared
+        mkdir -p /var/log/cloudflared
+        chown cloudflared:cloudflared /var/log/cloudflared 2>/dev/null || true
+    else
+        # Running as regular user, use sudo
+        info "Using sudo to create system directories..."
+        sudo mkdir -p /etc/cloudflared
+        sudo mkdir -p /var/log/cloudflared
+        sudo chown cloudflared:cloudflared /var/log/cloudflared 2>/dev/null || true
+    fi
     
     # Login to Cloudflare (opens browser for authentication)
     info "🔐 Authenticating with Cloudflare..."
@@ -92,8 +103,11 @@ setup_tunnel() {
     info "Tunnel ID: $tunnel_id"
     info "Credentials saved to: /root/.cloudflared/$tunnel_id.json"
     
-    # Create tunnel configuration
-    cat > /etc/cloudflared/config.yml << EOF
+    # Create tunnel configuration with proper permissions
+    info "📝 Creating tunnel configuration..."
+    if [[ $EUID -eq 0 ]]; then
+        # Running as root
+        cat > /etc/cloudflared/config.yml << EOF
 tunnel: $tunnel_id
 credentials-file: /root/.cloudflared/$tunnel_id.json
 
@@ -113,6 +127,29 @@ ingress:
   # Catch-all rule
   - service: http_status:404
 EOF
+    else
+        # Running as regular user, use sudo
+        sudo tee /etc/cloudflared/config.yml > /dev/null << EOF
+tunnel: $tunnel_id
+credentials-file: /root/.cloudflared/$tunnel_id.json
+
+ingress:
+  # VS Code Server
+  - hostname: code.remote.domain.tld
+    service: http://localhost:8080
+    originRequest:
+      noTLSVerify: true
+  
+  # Wildcard for projects
+  - hostname: "*.remote.domain.tld"
+    service: http://localhost:80
+    originRequest:
+      noTLSVerify: true
+  
+  # Catch-all rule
+  - service: http_status:404
+EOF
+    fi
     
     # Create DNS records (following Cloudflare dashboard workflow)
     info "🌐 Setting up DNS records..."
@@ -130,8 +167,11 @@ EOF
     info "  - code.$domain (VS Code Server)"
     info "  - *.$domain (Wildcard for projects)"
     
-    # Create systemd service
-    cat > /etc/systemd/system/cloudflared.service << EOF
+    # Create systemd service with proper permissions
+    info "⚙️  Creating systemd service..."
+    if [[ $EUID -eq 0 ]]; then
+        # Running as root
+        cat > /etc/systemd/system/cloudflared.service << EOF
 [Unit]
 Description=Cloudflared tunnel
 After=network.target
@@ -148,11 +188,40 @@ StandardError=journal
 [Install]
 WantedBy=multi-user.target
 EOF
+    else
+        # Running as regular user, use sudo
+        sudo tee /etc/systemd/system/cloudflared.service > /dev/null << EOF
+[Unit]
+Description=Cloudflared tunnel
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/cloudflared tunnel --config /etc/cloudflared/config.yml run
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    fi
     
     # Start tunnel service
-    systemctl daemon-reload
-    systemctl enable cloudflared
-    systemctl start cloudflared
+    info "🚀 Starting Cloudflared service..."
+    if [[ $EUID -eq 0 ]]; then
+        # Running as root
+        systemctl daemon-reload
+        systemctl enable cloudflared
+        systemctl start cloudflared
+    else
+        # Running as regular user, use sudo
+        sudo systemctl daemon-reload
+        sudo systemctl enable cloudflared
+        sudo systemctl start cloudflared
+    fi
     
     success "🎉 Cloudflared tunnel configured successfully!"
     
