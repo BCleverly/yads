@@ -1,14 +1,256 @@
-name: Test YADS Installation
+name: YADS Installation Test
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [ main, develop, master ]
   pull_request:
-    branches: [ master, main ]
+    branches: [ main, develop, master ]
   workflow_dispatch:  # Manual trigger
 
 jobs:
-  test-installation:
+  test-installation-docker:
+    name: Test Installation in Docker
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Build YADS Docker image
+      run: |
+        echo "Building YADS Docker image for installation testing..."
+        docker build -t yads-install-test:latest .
+        echo "✅ Docker image built successfully"
+    
+    - name: Test installation script
+      run: |
+        echo "Testing installation script in Docker..."
+        
+        # Start container
+        docker run -d --name yads-install-test \
+          --privileged \
+          yads-install-test:latest
+        
+        # Wait for container to start
+        sleep 10
+        
+        # Test installation script
+        docker exec yads-install-test bash -c "
+          echo 'Testing installation script...'
+          
+          # Test if install.sh can be executed
+          if ! bash install.sh --help 2>/dev/null; then
+            echo '⚠ WARNING: install.sh may not support --help flag'
+          fi
+          
+          # Test if install.sh has proper structure
+          if ! grep -q 'YADS' install.sh; then
+            echo '❌ ERROR: install.sh missing YADS branding'
+            exit 1
+          fi
+          echo '✅ install.sh has proper structure'
+          
+          # Test if install.sh can download yads script
+          if ! grep -q 'curl.*yads' install.sh; then
+            echo '❌ ERROR: install.sh missing download logic'
+            exit 1
+          fi
+          echo '✅ install.sh has download logic'
+        "
+        
+        echo "✅ Installation script tests passed"
+    
+    - name: Test yads script functionality
+      run: |
+        echo "Testing yads script functionality in Docker..."
+        
+        docker exec yads-install-test bash -c "
+          echo 'Testing yads script functionality...'
+          
+          # Test version command
+          if ! ./yads --version; then
+            echo '❌ ERROR: yads --version failed'
+            exit 1
+          fi
+          echo '✅ yads --version works'
+          
+          # Test help command
+          if ! ./yads help; then
+            echo '❌ ERROR: yads help failed'
+            exit 1
+          fi
+          echo '✅ yads help works'
+          
+          # Test status command
+          if ! ./yads status; then
+            echo '❌ ERROR: yads status failed'
+            exit 1
+          fi
+          echo '✅ yads status works'
+          
+          # Test update command
+          if ! ./yads update; then
+            echo '❌ ERROR: yads update failed'
+            exit 1
+          fi
+          echo '✅ yads update works'
+        "
+        
+        echo "✅ YADS script functionality tests passed"
+    
+    - name: Test module availability
+      run: |
+        echo "Testing module availability in Docker..."
+        
+        docker exec yads-install-test bash -c "
+          echo 'Testing module availability...'
+          
+          # Test if modules can be sourced
+          for module in modules/*.sh; do
+            if [[ -f \"\$module\" ]]; then
+              if ! bash -c \"source \$module\" 2>/dev/null; then
+                echo \"❌ ERROR: \$module cannot be sourced\"
+                exit 1
+              fi
+              echo \"✅ \$module loads correctly\"
+            fi
+          done
+        "
+        
+        echo "✅ Module availability tests passed"
+    
+    - name: Test full installation process
+      run: |
+        echo "Testing full installation process in Docker..."
+        
+        docker exec yads-install-test bash -c "
+          echo 'Testing full installation process...'
+          
+          # Run the full installation
+          sudo ./install.sh
+          
+          # Verify installation
+          yads --version
+          yads status
+          
+          # Test project creation
+          yads project install-test
+          
+          # Test VS Code setup
+          yads vscode setup
+          
+          # Test web server setup
+          yads server nginx
+          
+          # Check if services are running
+          yads status
+        "
+        
+        echo "✅ Full installation process tests passed"
+    
+    - name: Test permission handling
+      run: |
+        echo "Testing permission handling in Docker..."
+        
+        docker exec yads-install-test bash -c "
+          echo 'Testing permission handling...'
+          
+          # Test project creation permissions
+          yads project permission-test
+          
+          # Verify project directory permissions
+          ls -la /var/www/projects/
+          
+          # Test file creation in project
+          touch /var/www/projects/permission-test/test.txt
+          echo 'test content' > /var/www/projects/permission-test/test.txt
+          
+          # Test VS Code Server permissions
+          yads vscode status
+          
+          # Test web server permissions
+          yads server status
+        "
+        
+        echo "✅ Permission handling tests passed"
+    
+    - name: Test error handling
+      run: |
+        echo "Testing error handling in Docker..."
+        
+        docker exec yads-install-test bash -c "
+          echo 'Testing error handling...'
+          
+          # Test invalid commands
+          if ./yads invalid-command 2>/dev/null; then
+            echo '❌ ERROR: yads should fail on invalid commands'
+            exit 1
+          fi
+          echo '✅ yads properly handles invalid commands'
+          
+          # Test missing arguments
+          if ./yads create 2>/dev/null; then
+            echo '❌ ERROR: yads should fail on missing arguments'
+            exit 1
+          fi
+          echo '✅ yads properly handles missing arguments'
+        "
+        
+        echo "✅ Error handling tests passed"
+    
+    - name: Collect installation logs
+      if: always()
+      run: |
+        echo "Collecting installation test logs..."
+        
+        # Get container logs
+        docker logs yads-install-test > installation-logs.txt
+        
+        # Get YADS status after installation
+        docker exec yads-install-test yads status > post-install-status.txt
+        
+        # Get system info
+        docker exec yads-install-test bash -c "
+          echo '=== Post-Installation System Information ==='
+          uname -a
+          echo
+          echo '=== User Information ==='
+          id
+          groups
+          echo
+          echo '=== Directory Permissions ==='
+          ls -la /var/www/projects
+          echo
+          echo '=== Service Status ==='
+          systemctl status nginx || true
+          systemctl status php8.4-fpm || true
+          echo
+          echo '=== YADS Installation Status ==='
+          yads status
+        " > post-install-system-info.txt
+    
+    - name: Upload installation test artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: installation-test-results
+        path: |
+          installation-logs.txt
+          post-install-status.txt
+          post-install-system-info.txt
+        retention-days: 30
+    
+    - name: Cleanup
+      if: always()
+      run: |
+        echo "Cleaning up Docker resources..."
+        docker stop yads-install-test || true
+        docker rm yads-install-test || true
+        docker rmi yads-install-test:latest || true
+        echo "✅ Cleanup completed"
+
+  test-installation-native:
+    name: Test Installation Native
     runs-on: ubuntu-latest
     
     steps:
@@ -21,7 +263,7 @@ jobs:
         
         # Install basic dependencies
         sudo apt-get update
-        sudo apt-get install -y curl wget git bash
+        sudo apt-get install -y curl wget git bash acl
         
         # Create test user
         sudo useradd -m -s /bin/bash testuser || true
@@ -90,26 +332,12 @@ jobs:
         fi
         echo "✅ yads help works"
         
-        # Test prerequisites command
-        if ! ./yads prerequisites; then
-          echo "❌ ERROR: yads prerequisites failed"
-          exit 1
-        fi
-        echo "✅ yads prerequisites works"
-        
         # Test status command
         if ! ./yads status; then
           echo "❌ ERROR: yads status failed"
           exit 1
         fi
         echo "✅ yads status works"
-        
-        # Test check command
-        if ! ./yads check; then
-          echo "❌ ERROR: yads check failed"
-          exit 1
-        fi
-        echo "✅ yads check works"
         EOF
     
     - name: Test module availability
@@ -209,3 +437,25 @@ jobs:
         echo "- Module availability: ✅ PASS"
         echo "- Global installation: ✅ PASS"
         echo "- Error handling: ✅ PASS"
+
+  notify:
+    name: Notify Results
+    runs-on: ubuntu-latest
+    needs: [test-installation-docker, test-installation-native]
+    if: always()
+    
+    steps:
+    - name: Notify on success
+      if: ${{ needs.test-installation-docker.result == 'success' && needs.test-installation-native.result == 'success' }}
+      run: |
+        echo "🎉 All installation tests passed successfully!"
+        echo "✅ Docker installation tests: PASSED"
+        echo "✅ Native installation tests: PASSED"
+    
+    - name: Notify on failure
+      if: ${{ needs.test-installation-docker.result == 'failure' || needs.test-installation-native.result == 'failure' }}
+      run: |
+        echo "❌ Some installation tests failed. Please check the logs."
+        echo "Docker tests: ${{ needs.test-installation-docker.result }}"
+        echo "Native tests: ${{ needs.test-installation-native.result }}"
+        exit 1

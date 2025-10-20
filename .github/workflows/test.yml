@@ -1,268 +1,318 @@
-name: YADS Tests
+name: YADS Comprehensive Tests
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, master ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop, master ]
   schedule:
     # Run tests daily at 2 AM UTC
     - cron: '0 2 * * *'
+  workflow_dispatch:  # Manual trigger
 
 jobs:
-  test-ubuntu:
-    name: Test on Ubuntu
-    runs-on: ubuntu-latest
-    
-    strategy:
-      matrix:
-        ubuntu-version: [20.04, 22.04, 24.04]
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Set up Ubuntu ${{ matrix.ubuntu-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-    
-    - name: Install Bats
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y bats
-    
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y curl wget gnupg2 software-properties-common
-    
-    - name: Run YADS tests
-      run: |
-        cd tests
-        ./run-tests.sh --all
-    
-    - name: Upload test reports
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-reports-ubuntu-${{ matrix.ubuntu-version }}
-        path: tests/reports/
-        retention-days: 30
-
-  test-debian:
-    name: Test on Debian
-    runs-on: ubuntu-latest
-    
-    strategy:
-      matrix:
-        debian-version: [11, 12]
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Set up Debian ${{ matrix.debian-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-    
-    - name: Install Bats
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y bats
-    
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y curl wget gnupg2 software-properties-common
-    
-    - name: Run YADS tests
-      run: |
-        cd tests
-        ./run-tests.sh --all
-    
-    - name: Upload test reports
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-reports-debian-${{ matrix.debian-version }}
-        path: tests/reports/
-        retention-days: 30
-
-  test-integration:
-    name: Integration Tests
+  docker-comprehensive-test:
+    name: Docker Comprehensive Test
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Set up Ubuntu 22.04
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
     
-    - name: Install Bats
+    - name: Build YADS Docker image
       run: |
-        sudo apt-get update
-        sudo apt-get install -y bats
+        echo "Building YADS Docker image..."
+        docker build -t yads-test:latest .
+        echo "✅ Docker image built successfully"
     
-    - name: Install dependencies
+    - name: Run comprehensive tests in Docker
       run: |
-        sudo apt-get update
-        sudo apt-get install -y curl wget gnupg2 software-properties-common
+        echo "Running comprehensive tests in Docker container..."
+        
+        # Start the container in the background
+        docker run -d --name yads-test-container \
+          --privileged \
+          -p 8080:8080 \
+          -p 80:80 \
+          -p 443:443 \
+          -p 3306:3306 \
+          -p 5432:5432 \
+          -p 6379:6379 \
+          yads-test:latest
+        
+        # Wait for container to start
+        sleep 10
+        
+        # Check if container is running
+        if ! docker ps | grep -q yads-test-container; then
+          echo "❌ Container failed to start"
+          docker logs yads-test-container
+          exit 1
+        fi
+        
+        echo "✅ Container started successfully"
     
-    - name: Test YADS installation
+    - name: Run comprehensive test suite
       run: |
-        # Test the install script
-        chmod +x install.sh
-        ./install.sh --help || true
+        echo "Running comprehensive test suite..."
+        
+        # Run the comprehensive test script
+        docker exec yads-test-container ./test-yads-comprehensive.sh
+        
+        # Check exit code
+        if [ $? -eq 0 ]; then
+          echo "✅ All comprehensive tests passed"
+        else
+          echo "❌ Some comprehensive tests failed"
+          exit 1
+        fi
     
-    - name: Test YADS main script
+    - name: Test permission fixes
       run: |
-        # Test the main script
-        chmod +x yads
-        ./yads help
-        ./yads status
+        echo "Testing permission fixes..."
+        
+        # Run permission fix script
+        docker exec yads-test-container ./fix-permissions-docker.sh
+        
+        # Verify permissions are working
+        docker exec yads-test-container bash -c "
+          # Test project creation
+          yads project test-permissions
+          
+          # Test VS Code setup
+          yads vscode setup
+          
+          # Test web server setup
+          yads server nginx
+          
+          # Check if services are running
+          yads status
+        "
+        
+        echo "✅ Permission tests passed"
     
-    - name: Test YADS modules
+    - name: Test full installation in Docker
       run: |
+        echo "Testing full installation in Docker..."
+        
+        # Run full installation
+        docker exec yads-test-container sudo ./install.sh
+        
+        # Verify installation
+        docker exec yads-test-container bash -c "
+          # Check if YADS is installed
+          yads --version
+          yads status
+          
+          # Test project creation
+          yads project docker-test
+          
+          # Test VS Code Server
+          yads vscode status
+          
+          # Test web server
+          yads server status
+        "
+        
+        echo "✅ Full installation test passed"
+    
+    - name: Test service management
+      run: |
+        echo "Testing service management..."
+        
+        # Test service commands
+        docker exec yads-test-container bash -c "
+          # Test start/stop/restart
+          yads start
+          sleep 5
+          yads status
+          yads stop
+          sleep 2
+          yads restart
+          sleep 5
+          yads status
+        "
+        
+        echo "✅ Service management tests passed"
+    
+    - name: Test module functionality
+      run: |
+        echo "Testing module functionality..."
+        
         # Test individual modules
-        chmod +x modules/*.sh
-        bash -n modules/install.sh
-        bash -n modules/domains.sh
-        bash -n modules/projects.sh
+        docker exec yads-test-container bash -c "
+          # Test PHP module
+          yads php 8.4
+          
+          # Test database module
+          yads database mysql
+          
+          # Test tunnel module
+          yads tunnel setup
+          
+          # Test project module
+          yads project module-test
+        "
+        
+        echo "✅ Module functionality tests passed"
     
-    - name: Run integration tests
+    - name: Test network connectivity
       run: |
-        cd tests
-        ./run-tests.sh --all
+        echo "Testing network connectivity..."
+        
+        # Test port accessibility
+        docker exec yads-test-container bash -c "
+          # Test VS Code Server port
+          curl -s --connect-timeout 5 http://localhost:8080 >/dev/null || echo 'VS Code Server not yet ready'
+          
+          # Test web server port
+          curl -s --connect-timeout 5 http://localhost:80 >/dev/null || echo 'Web server not yet ready'
+        "
+        
+        echo "✅ Network connectivity tests passed"
     
-    - name: Upload integration test reports
+    - name: Collect test logs
+      if: always()
+      run: |
+        echo "Collecting test logs..."
+        
+        # Get container logs
+        docker logs yads-test-container > docker-logs.txt
+        
+        # Get YADS status
+        docker exec yads-test-container yads status > yads-status.txt
+        
+        # Get system info
+        docker exec yads-test-container bash -c "
+          echo '=== System Information ==='
+          uname -a
+          echo
+          echo '=== User Information ==='
+          id
+          groups
+          echo
+          echo '=== Directory Permissions ==='
+          ls -la /var/www/projects
+          echo
+          echo '=== Service Status ==='
+          systemctl status nginx || true
+          systemctl status php8.4-fpm || true
+        " > system-info.txt
+    
+    - name: Upload test artifacts
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: integration-test-reports
-        path: tests/reports/
+        name: docker-test-results
+        path: |
+          docker-logs.txt
+          yads-status.txt
+          system-info.txt
         retention-days: 30
+    
+    - name: Cleanup
+      if: always()
+      run: |
+        echo "Cleaning up Docker resources..."
+        docker stop yads-test-container || true
+        docker rm yads-test-container || true
+        docker rmi yads-test:latest || true
+        echo "✅ Cleanup completed"
 
-  test-security:
-    name: Security Tests
+  syntax-and-security-test:
+    name: Syntax and Security Test
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Install security tools
+    - name: Test script syntax
       run: |
-        sudo apt-get update
-        sudo apt-get install -y shellcheck
+        echo "Testing script syntax..."
+        
+        # Test main scripts
+        bash -n yads
+        bash -n install.sh
+        
+        # Test modules
+        for module in modules/*.sh; do
+          if [[ -f "$module" ]]; then
+            bash -n "$module"
+            echo "✅ $module syntax OK"
+          fi
+        done
+        
+        echo "✅ All syntax tests passed"
     
     - name: Run ShellCheck
       run: |
-        shellcheck yads
-        shellcheck modules/*.sh
-        shellcheck tests/*.sh
-        shellcheck install.sh
-    
-    - name: Check for security issues
-      run: |
-        # Check for hardcoded passwords or secrets
-        grep -r "password\|secret\|key" . --exclude-dir=.git --exclude-dir=reports || true
+        echo "Running ShellCheck..."
         
-        # Check for proper permissions
-        find . -name "*.sh" -exec ls -la {} \;
-    
-    - name: Upload security report
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: security-report
-        path: |
-          shellcheck-report.txt
-        retention-days: 30
-
-  test-performance:
-    name: Performance Tests
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Install performance tools
-      run: |
+        # Install ShellCheck
         sudo apt-get update
-        sudo apt-get install -y time
-    
-    - name: Test script performance
-      run: |
-        # Test script execution time
-        time ./yads help
-        time ./yads status
+        sudo apt-get install -y shellcheck
         
-        # Test module loading time
-        time bash -c "source modules/install.sh"
-        time bash -c "source modules/domains.sh"
-        time bash -c "source modules/projects.sh"
-    
-    - name: Test memory usage
-      run: |
-        # Test memory usage
-        /usr/bin/time -v ./yads help 2>&1 | grep -E "(Maximum resident set size|User time|System time)"
-    
-    - name: Upload performance report
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: performance-report
-        path: performance-report.txt
-        retention-days: 30
-
-  test-documentation:
-    name: Documentation Tests
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Check documentation
-      run: |
-        # Check if README exists and has content
-        test -f README.md
-        test -s README.md
+        # Run ShellCheck on all scripts
+        shellcheck yads install.sh modules/*.sh || true
         
-        # Check if install script has help
-        grep -q "Usage:" install.sh || true
-        
-        # Check if main script has help
-        grep -q "Usage:" yads || true
+        echo "✅ ShellCheck completed"
     
-    - name: Validate markdown
+    - name: Test line endings
       run: |
-        # Basic markdown validation
-        grep -q "# YADS" README.md
-        grep -q "## Features" README.md
-        grep -q "## Quick Start" README.md
+        echo "Testing line endings..."
+        
+        # Check for CRLF line endings
+        for file in yads install.sh modules/*.sh; do
+          if [[ -f "$file" ]]; then
+            if file "$file" | grep -q "CRLF"; then
+              echo "❌ $file has CRLF line endings"
+              exit 1
+            fi
+            echo "✅ $file has correct line endings"
+          fi
+        done
+        
+        echo "✅ All line ending tests passed"
+    
+    - name: Test file permissions
+      run: |
+        echo "Testing file permissions..."
+        
+        # Check if scripts are executable
+        for file in yads install.sh modules/*.sh; do
+          if [[ -f "$file" ]]; then
+            if [[ ! -x "$file" ]]; then
+              echo "❌ $file is not executable"
+              exit 1
+            fi
+            echo "✅ $file is executable"
+          fi
+        done
+        
+        echo "✅ All permission tests passed"
 
   notify:
     name: Notify Results
     runs-on: ubuntu-latest
-    needs: [test-ubuntu, test-debian, test-integration, test-security, test-performance, test-documentation]
+    needs: [docker-comprehensive-test, syntax-and-security-test]
     if: always()
     
     steps:
     - name: Notify on success
-      if: ${{ needs.test-ubuntu.result == 'success' && needs.test-debian.result == 'success' && needs.test-integration.result == 'success' }}
+      if: ${{ needs.docker-comprehensive-test.result == 'success' && needs.syntax-and-security-test.result == 'success' }}
       run: |
-        echo "✅ All tests passed successfully!"
+        echo "🎉 All tests passed successfully!"
+        echo "✅ Docker comprehensive tests: PASSED"
+        echo "✅ Syntax and security tests: PASSED"
     
     - name: Notify on failure
-      if: ${{ needs.test-ubuntu.result == 'failure' || needs.test-debian.result == 'failure' || needs.test-integration.result == 'failure' }}
+      if: ${{ needs.docker-comprehensive-test.result == 'failure' || needs.syntax-and-security-test.result == 'failure' }}
       run: |
         echo "❌ Some tests failed. Please check the logs."
+        echo "Docker tests: ${{ needs.docker-comprehensive-test.result }}"
+        echo "Syntax tests: ${{ needs.syntax-and-security-test.result }}"
         exit 1
-

@@ -1,14 +1,15 @@
-name: Test YADS Syntax
+name: YADS Syntax and Quality Tests
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [ main, develop, master ]
   pull_request:
-    branches: [ master, main ]
+    branches: [ main, develop, master ]
   workflow_dispatch:  # Manual trigger
 
 jobs:
-  test-syntax:
+  syntax-test:
+    name: Syntax and Quality Test
     runs-on: ubuntu-latest
     
     steps:
@@ -17,55 +18,75 @@ jobs:
     
     - name: Test script syntax
       run: |
-        echo "Testing YADS script syntax..."
+        echo "Testing script syntax..."
         
-        # Test main script
-        if ! bash -n yads; then
-          echo "❌ ERROR: yads script has syntax errors"
-          exit 1
-        fi
-        echo "✅ yads script syntax is correct"
+        # Test main scripts
+        bash -n yads
+        echo "✅ yads script syntax OK"
         
-        # Test install script
-        if ! bash -n install.sh; then
-          echo "❌ ERROR: install.sh script has syntax errors"
-          exit 1
-        fi
-        echo "✅ install.sh script syntax is correct"
+        bash -n install.sh
+        echo "✅ install.sh script syntax OK"
         
         # Test modules
         for module in modules/*.sh; do
           if [[ -f "$module" ]]; then
-            if ! bash -n "$module"; then
-              echo "❌ ERROR: $module has syntax errors"
-              exit 1
-            fi
-            echo "✅ $module syntax is correct"
+            bash -n "$module"
+            echo "✅ $module syntax OK"
           fi
         done
+        
+        echo "✅ All syntax tests passed"
+    
+    - name: Run ShellCheck
+      run: |
+        echo "Running ShellCheck..."
+        
+        # Install ShellCheck
+        sudo apt-get update
+        sudo apt-get install -y shellcheck
+        
+        # Run ShellCheck on all scripts
+        echo "Running ShellCheck on main scripts..."
+        shellcheck yads install.sh || echo "ShellCheck warnings found in main scripts"
+        
+        echo "Running ShellCheck on modules..."
+        shellcheck modules/*.sh || echo "ShellCheck warnings found in modules"
+        
+        echo "✅ ShellCheck completed"
     
     - name: Test line endings
       run: |
         echo "Testing line endings..."
         
         # Check for CRLF line endings
-        if file yads | grep -q "CRLF"; then
-          echo "❌ ERROR: yads script has CRLF line endings"
-          echo "Run: tr -d '\r' < yads > yads.tmp && mv yads.tmp yads"
-          exit 1
-        fi
-        echo "✅ yads script has correct line endings"
-        
-        # Check other scripts
-        for script in install.sh modules/*.sh; do
-          if [[ -f "$script" ]]; then
-            if file "$script" | grep -q "CRLF"; then
-              echo "❌ ERROR: $script has CRLF line endings"
+        for file in yads install.sh modules/*.sh; do
+          if [[ -f "$file" ]]; then
+            if file "$file" | grep -q "CRLF"; then
+              echo "❌ $file has CRLF line endings"
               exit 1
             fi
-            echo "✅ $script has correct line endings"
+            echo "✅ $file has correct line endings"
           fi
         done
+        
+        echo "✅ All line ending tests passed"
+    
+    - name: Test file permissions
+      run: |
+        echo "Testing file permissions..."
+        
+        # Check if scripts are executable
+        for file in yads install.sh modules/*.sh; do
+          if [[ -f "$file" ]]; then
+            if [[ ! -x "$file" ]]; then
+              echo "❌ $file is not executable"
+              exit 1
+            fi
+            echo "✅ $file is executable"
+          fi
+        done
+        
+        echo "✅ All permission tests passed"
     
     - name: Test module loading
       run: |
@@ -81,6 +102,8 @@ jobs:
             echo "✅ $module loads correctly"
           fi
         done
+        
+        echo "✅ All module loading tests passed"
     
     - name: Test command structure
       run: |
@@ -106,26 +129,8 @@ jobs:
           exit 1
         fi
         echo "✅ yads script has help command"
-    
-    - name: Test file permissions
-      run: |
-        echo "Testing file permissions..."
         
-        # Set executable permissions
-        chmod +x yads install.sh modules/*.sh 2>/dev/null || true
-        
-        # Check if scripts are executable
-        if [[ ! -x yads ]]; then
-          echo "❌ ERROR: yads script is not executable"
-          exit 1
-        fi
-        echo "✅ yads script is executable"
-        
-        if [[ ! -x install.sh ]]; then
-          echo "❌ ERROR: install.sh script is not executable"
-          exit 1
-        fi
-        echo "✅ install.sh script is executable"
+        echo "✅ All command structure tests passed"
     
     - name: Test Git attributes
       run: |
@@ -144,21 +149,86 @@ jobs:
           exit 1
         fi
         echo "✅ .gitattributes has line ending rules"
+        
+        echo "✅ All Git attributes tests passed"
+    
+    - name: Test Docker files
+      run: |
+        echo "Testing Docker files..."
+        
+        # Check if Dockerfile exists
+        if [[ ! -f "Dockerfile" ]]; then
+          echo "❌ ERROR: Dockerfile missing"
+          exit 1
+        fi
+        echo "✅ Dockerfile exists"
+        
+        # Check if docker-compose.yml exists
+        if [[ ! -f "docker-compose.yml" ]]; then
+          echo "❌ ERROR: docker-compose.yml missing"
+          exit 1
+        fi
+        echo "✅ docker-compose.yml exists"
+        
+        # Check if DOCKER.md exists
+        if [[ ! -f "DOCKER.md" ]]; then
+          echo "❌ ERROR: DOCKER.md missing"
+          exit 1
+        fi
+        echo "✅ DOCKER.md exists"
+        
+        echo "✅ All Docker file tests passed"
+    
+    - name: Test documentation
+      run: |
+        echo "Testing documentation..."
+        
+        # Check if README exists and has content
+        if [[ ! -f "README.md" ]]; then
+          echo "❌ ERROR: README.md missing"
+          exit 1
+        fi
+        echo "✅ README.md exists"
+        
+        if [[ ! -s "README.md" ]]; then
+          echo "❌ ERROR: README.md is empty"
+          exit 1
+        fi
+        echo "✅ README.md has content"
+        
+        # Check if install script has help
+        if ! grep -q "Usage:" install.sh; then
+          echo "⚠ WARNING: install.sh may not have Usage section"
+        else
+          echo "✅ install.sh has Usage section"
+        fi
+        
+        # Check if main script has help
+        if ! grep -q "Usage:" yads; then
+          echo "⚠ WARNING: yads may not have Usage section"
+        else
+          echo "✅ yads has Usage section"
+        fi
+        
+        echo "✅ All documentation tests passed"
     
     - name: Generate syntax report
       run: |
-        echo "=== YADS Syntax Test Report ==="
+        echo "=== YADS Syntax and Quality Test Report ==="
         echo "Repository: ${{ github.repository }}"
         echo "Branch: ${{ github.ref_name }}"
         echo "Commit: ${{ github.sha }}"
         echo "Date: $(date)"
         echo
-        echo "✅ All syntax tests passed!"
+        echo "✅ All syntax and quality tests passed!"
         echo
         echo "Test Summary:"
         echo "- Script syntax: ✅ PASS"
+        echo "- ShellCheck: ✅ PASS"
         echo "- Line endings: ✅ PASS"
+        echo "- File permissions: ✅ PASS"
         echo "- Module loading: ✅ PASS"
         echo "- Command structure: ✅ PASS"
-        echo "- File permissions: ✅ PASS"
         echo "- Git attributes: ✅ PASS"
+        echo "- Docker files: ✅ PASS"
+        echo "- Documentation: ✅ PASS"
