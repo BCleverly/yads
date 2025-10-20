@@ -673,8 +673,8 @@ create_yads_structure() {
     mkdir -p "$projects_dir"
     mkdir -p /etc/yads
     
-    # Set up proper permissions for web development
-    info "🔐 Setting up proper permissions for web development..."
+    # Set up comprehensive permissions for web development
+    info "🔐 Setting up comprehensive permissions for web development..."
     
     # Get the current user (the one who will be developing)
     local dev_user=""
@@ -687,10 +687,23 @@ create_yads_structure() {
     # Create a web development group
     if ! getent group webdev >/dev/null 2>&1; then
         groupadd webdev
+        success "Created webdev group"
+    else
+        info "webdev group already exists"
     fi
     
     # Add the development user to the webdev group
     usermod -a -G webdev "$dev_user"
+    success "Added $dev_user to webdev group"
+    
+    # Set up VS Code Server permissions
+    info "💻 Setting up VS Code Server permissions..."
+    
+    # Add vscode user to webdev group if it exists
+    if id vscode >/dev/null 2>&1; then
+        usermod -a -G webdev vscode
+        success "Added vscode user to webdev group"
+    fi
     
     # Set proper ownership and permissions for projects directory
     chown -R "$dev_user:webdev" "$projects_dir"
@@ -698,13 +711,91 @@ create_yads_structure() {
     
     # Set up proper permissions for web server access
     # Allow webdev group to write to projects directory
-    setfacl -R -m g:webdev:rwx "$projects_dir"
-    setfacl -R -d -m g:webdev:rwx "$projects_dir"
+    if command -v setfacl >/dev/null 2>&1; then
+        setfacl -R -m g:webdev:rwx "$projects_dir"
+        setfacl -R -d -m g:webdev:rwx "$projects_dir"
+        success "ACL permissions set for webdev group"
+    else
+        warning "setfacl not available, using standard permissions"
+    fi
     
     # Ensure web server can read the projects
     chmod 755 "$projects_dir"
     
-    success "Permissions set up for user: $dev_user"
+    # Set up web server permissions
+    info "🌐 Setting up web server permissions..."
+    
+    # Configure Nginx to run as webdev group
+    if command -v nginx >/dev/null 2>&1; then
+        # Update nginx.conf to run as webdev group
+        sed -i 's/user www-data;/user webdev;/' /etc/nginx/nginx.conf 2>/dev/null || true
+        success "Nginx configured for webdev group"
+    fi
+    
+    # Configure PHP-FPM to run as webdev group
+    if command -v php-fpm8.4 >/dev/null 2>&1; then
+        local pool_file="/etc/php/8.4/fpm/pool.d/www.conf"
+        if [[ -f "$pool_file" ]]; then
+            sed -i 's/group = www-data/group = webdev/' "$pool_file"
+            sed -i 's/user = www-data/user = webdev/' "$pool_file"
+            success "PHP-FPM configured for webdev group"
+        fi
+    fi
+    
+    # Set up development tools permissions
+    info "🛠️  Setting up development tools permissions..."
+    
+    # Node.js and npm permissions
+    if command -v node >/dev/null 2>&1; then
+        # Set up npm global directory for the development user
+        local npm_dir="/home/$dev_user/.npm-global"
+        mkdir -p "$npm_dir"
+        chown -R "$dev_user:webdev" "$npm_dir"
+        
+        # Configure npm to use the global directory
+        sudo -u "$dev_user" npm config set prefix "$npm_dir" 2>/dev/null || true
+        success "Node.js permissions configured"
+    fi
+    
+    # Composer permissions
+    if command -v composer >/dev/null 2>&1; then
+        # Set up composer cache directory
+        local composer_dir="/home/$dev_user/.composer"
+        mkdir -p "$composer_dir"
+        chown -R "$dev_user:webdev" "$composer_dir"
+        success "Composer permissions configured"
+    fi
+    
+    # Create a test project to verify permissions
+    info "🧪 Creating test project to verify permissions..."
+    local test_project="/var/www/projects/permission-test"
+    
+    # Create test project as development user
+    sudo -u "$dev_user" mkdir -p "$test_project"
+    sudo -u "$dev_user" tee "$test_project/index.php" > /dev/null << 'EOF'
+<?php
+echo "<h1>Permission Test</h1>";
+echo "<p>User: " . get_current_user() . "</p>";
+echo "<p>Group: " . posix_getgrgid(posix_getgid())['name'] . "</p>";
+echo "<p>Document Root: " . $_SERVER['DOCUMENT_ROOT'] . "</p>";
+echo "<p>PHP Version: " . phpversion() . "</p>";
+echo "<p>✅ Permissions working correctly!</p>";
+?>
+EOF
+    
+    # Set proper permissions
+    chown -R "$dev_user:webdev" "$test_project"
+    chmod -R 775 "$test_project"
+    
+    # Test write permissions
+    if sudo -u "$dev_user" touch "$test_project/test-write.txt" 2>/dev/null; then
+        success "Write permissions working for $dev_user"
+        rm -f "$test_project/test-write.txt"
+    else
+        error "Write permissions not working for $dev_user"
+    fi
+    
+    success "Comprehensive permissions set up for user: $dev_user"
     success "Projects directory: $projects_dir (owned by $dev_user:webdev)"
     
     # Try multiple locations for YADS files
