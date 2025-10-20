@@ -26,17 +26,20 @@ docker run -it --privileged --name yads-test-container yads-test
 
 # Run in detached mode
 docker run -d --privileged --name yads-test-container yads-test
-```
-
-## 🧪 **Testing YADS**
-
-### **Run Tests Inside Container**
+`### **Run Tests Inside Container**
 ```bash
 # Enter the container
 docker exec -it yads-test-container bash
 
-# Run the test suite
-./test-docker.sh
+# Run comprehensive test suite
+./test-yads-comprehensive.sh
+
+# Fix permissions if needed
+./fix-permissions-docker.sh
+
+# Run YADS tests
+./test-yads.sh
+```h
 
 # Run YADS tests
 ./test-yads.sh
@@ -107,10 +110,10 @@ yads database mysql
 ### **Environment**
 - **OS**: Ubuntu 24.04 LTS
 - **User**: yadsuser (non-root)
-- **Privileged**: Yes (for systemd support)
-- **Systemd**: Enabled for service testing
-
-## 🚀 **Testing Scenarios**
+- **Privileged**: ### **1. Basic Functionality Test**
+```bash
+docker exec -it yads-test-container ./test-yads-comprehensive.sh
+```
 
 ### **1. Basic Functionality Test**
 ```bash
@@ -175,11 +178,13 @@ The test suite checks:
 - ✅ **Basic YADS functionality** (version, help, status)
 - ✅ **Update functionality** (yads update)
 - ✅ **Module loading** (all modules present)
-- ✅ **Script permissions** (all scripts executable)
-- ✅ **Installation readiness** (install.sh ready)
-- ✅ **Docker functionality** (systemd, sudo available)
-
-## 🔄 **Continuous Testing**
+- ✅ **Script permissions### **Automated Testing**
+```bash
+# Run tests on every build
+docker-compose up --build
+docker exec -it yads-test-container ./test-yads-comprehensive.sh
+docker-compose down
+```g**
 
 ### **Automated Testing**
 ```bash

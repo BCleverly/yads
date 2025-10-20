@@ -9,6 +9,7 @@ services:
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:ro
       - /tmp/yads-test:/tmp
+      - yads-projects:/var/www/projects
     ports:
       - "8080:8080"    # VS Code Server
       - "80:80"        # Web server
@@ -19,7 +20,12 @@ services:
     environment:
       - DEBIAN_FRONTEND=noninteractive
       - TZ=UTC
+      - YADS_TEST_MODE=true
     stdin_open: true
     tty: true
     restart: unless-stopped
     command: /home/yadsuser/entrypoint.sh
+
+volumes:
+  yads-projects:
+    driver: locale/yadsuser/entrypoint.sh
