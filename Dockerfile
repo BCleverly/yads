@@ -115,24 +115,17 @@ test_command() {
     ((tests_total++))
     info "Testing: $description"
     
-    if eval "$cmd" >/dev/null 2>&1; then
-        if [[ $? -eq $expected_exit_code ]]; then
-            success "$description - PASS"
-            ((tests_passed++))
-            return 0
-        else
-            error "$description - FAIL (wrong exit code: $?)"
-            return 1
-        fi
+    # Execute command and capture exit code
+    eval "$cmd" >/dev/null 2>&1
+    local exit_code=$?
+    
+    if [[ $exit_code -eq $expected_exit_code ]]; then
+        success "$description - PASS"
+        ((tests_passed++))
+        return 0
     else
-        if [[ $? -eq $expected_exit_code ]]; then
-            success "$description - PASS (expected failure)"
-            ((tests_passed++))
-            return 0
-        else
-            error "$description - FAIL (unexpected error: $?)"
-            return 1
-        fi
+        error "$description - FAIL (exit code: $exit_code, expected: $expected_exit_code)"
+        return 1
     fi
 }
 
@@ -159,7 +152,7 @@ echo
 info "📦 2. Module Loading Tests"
 echo "=========================="
 
-local modules=("php" "webserver" "database" "tunnel" "vscode" "project" "services" "uninstall")
+modules=("php" "webserver" "database" "tunnel" "vscode" "project" "services" "uninstall")
 for module in "${modules[@]}"; do
     test_command "[[ -f modules/${module}.sh ]] && [[ -x modules/${module}.sh ]]" "Module ${module}.sh exists and is executable"
 done
@@ -214,10 +207,10 @@ echo
 info "⚙️  7. Service Management Tests"
 echo "=============================="
 
-test_command "yads start" "yads start command"
-test_command "yads stop" "yads stop command"
-test_command "yads restart" "yads restart command"
-test_command "yads status" "yads status command"
+test_command "yads start" "yads start command" 0
+test_command "yads stop" "yads stop command" 0
+test_command "yads restart" "yads restart command" 0
+test_command "yads status" "yads status command" 0
 
 echo
 
@@ -225,10 +218,10 @@ echo
 info "🔧 8. Module-Specific Tests"
 echo "==========================="
 
-test_command "yads php 8.4" "yads php command"
-test_command "yads server nginx" "yads server command"
-test_command "yads database mysql" "yads database command"
-test_command "yads vscode status" "yads vscode status"
+test_command "yads php 8.4" "yads php command" 0
+test_command "yads server nginx" "yads server command" 0
+test_command "yads database mysql" "yads database command" 0
+test_command "yads vscode status" "yads vscode status" 0
 
 echo
 
@@ -236,8 +229,10 @@ echo
 info "📁 9. File System Tests"
 echo "======================="
 
-test_command "mkdir -p /tmp/yads-test && touch /tmp/yads-test/test.txt" "File creation test"
-test_command "echo 'test' > /tmp/yads-test/test.txt && cat /tmp/yads-test/test.txt" "File write/read test"
+test_command "mkdir -p /tmp/yads-test" "File creation test"
+test_command "touch /tmp/yads-test/test.txt" "File creation test"
+test_command "echo 'test' > /tmp/yads-test/test.txt" "File write test"
+test_command "cat /tmp/yads-test/test.txt" "File read test"
 test_command "rm -rf /tmp/yads-test" "File deletion test"
 
 echo

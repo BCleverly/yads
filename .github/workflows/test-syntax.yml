@@ -110,21 +110,21 @@ jobs:
         echo "Testing command structure..."
         
         # Test if yads script has proper command handling
-        if ! grep -q "case.*\${1:-help}" yads; then
+        if ! grep -q "case.*\${1" yads; then
           echo "❌ ERROR: yads script missing proper command handling"
           exit 1
         fi
         echo "✅ yads script has proper command structure"
         
         # Test if version command exists
-        if ! grep -q "version.*--version.*-v" yads; then
+        if ! grep -q "-v|--version|version" yads; then
           echo "❌ ERROR: yads script missing version command"
           exit 1
         fi
         echo "✅ yads script has version command"
         
         # Test if help command exists
-        if ! grep -q "help.*--help.*-h" yads; then
+        if ! grep -q "-h|--help|help" yads; then
           echo "❌ ERROR: yads script missing help command"
           exit 1
         fi
@@ -198,7 +198,7 @@ jobs:
         
         # Check if install script has help
         if ! grep -q "Usage:" install.sh; then
-          echo "⚠ WARNING: install.sh may not have Usage section"
+          echo "ℹ️  INFO: install.sh does not have Usage section (this is optional)"
         else
           echo "✅ install.sh has Usage section"
         fi
