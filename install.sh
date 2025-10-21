@@ -370,6 +370,19 @@ EOF
     systemctl enable "code-server@$vscode_user"
     systemctl start "code-server@$vscode_user"
     
+    # Ensure VS Code Server has proper permissions
+    info "🔧 Ensuring VS Code Server permissions are correct..."
+    chown -R "$vscode_user:$vscode_user" "/home/$vscode_user"
+    chmod -R 755 "/home/$vscode_user"
+    chmod 600 "/home/$vscode_user/.config/code-server/config.yaml"
+    
+    # Fix any Node.js permission issues
+    if [[ -d "/home/$vscode_user/.nvm" ]]; then
+        chown -R "$vscode_user:$vscode_user" "/home/$vscode_user/.nvm"
+        chmod -R 755 "/home/$vscode_user/.nvm"
+    fi
+    
+    success "VS Code Server permissions fixed"
     
     success "VS Code Server installed"
     info "VS Code Server password: $password"
@@ -854,8 +867,10 @@ EOF
     chmod +x "$yads_dir/yads"
     success "YADS script copied from: $yads_script"
     
-    # Create symlink
+    # Create symlink with proper permissions
     ln -sf "$yads_dir/yads" /usr/local/bin/yads
+    chmod 755 /usr/local/bin/yads
+    chown root:root /usr/local/bin/yads
     
     # Create version file
     if [[ -f "$script_dir/version" ]]; then
@@ -865,6 +880,12 @@ EOF
     fi
     
     success "YADS structure created"
+    
+    # Ensure /usr/local has proper permissions
+    info "🔧 Ensuring /usr/local permissions are correct..."
+    chown -R root:root /usr/local
+    chmod -R 755 /usr/local
+    success "/usr/local permissions fixed"
 }
 
 # Configure firewall
@@ -1082,6 +1103,28 @@ main() {
     configure_firewall
     
     success "🎉 YADS installation completed!"
+    
+    # Final permission verification and fix
+    info "🔍 Running final permission verification..."
+    
+    # Ensure /usr/local permissions are correct
+    chown -R root:root /usr/local
+    chmod -R 755 /usr/local
+    
+    # Ensure VS Code Server permissions are correct
+    if id vscode >/dev/null 2>&1; then
+        chown -R vscode:vscode /home/vscode
+        chmod -R 755 /home/vscode
+        chmod 600 /home/vscode/.config/code-server/config.yaml 2>/dev/null || true
+    fi
+    
+    # Ensure YADS script has proper permissions
+    if [[ -f "/usr/local/bin/yads" ]]; then
+        chown root:root /usr/local/bin/yads
+        chmod 755 /usr/local/bin/yads
+    fi
+    
+    success "Final permission verification completed"
     
     # Verify and fix PATH configuration
     verify_and_fix_path
