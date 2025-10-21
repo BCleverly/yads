@@ -105,10 +105,30 @@ fix_node_module_resolution() {
             chown -R vscode:vscode "$vscode_home/.nvm" 2>/dev/null || true
             chmod -R 755 "$vscode_home/.nvm" 2>/dev/null || true
             
-            # Clear NVM prefix issues
+            # Fix .npmrc conflicts for vscode user
+            local npmrc_file="$vscode_home/.npmrc"
+            if [[ -f "$npmrc_file" ]]; then
+                # Backup original .npmrc
+                cp "$npmrc_file" "$npmrc_file.backup.$(date +%Y%m%d_%H%M%S)" 2>/dev/null || true
+                
+                # Remove conflicting settings
+                sudo -u vscode sed -i '/^globalconfig/d' "$npmrc_file" 2>/dev/null || true
+                sudo -u vscode sed -i '/^prefix/d' "$npmrc_file" 2>/dev/null || true
+                sudo -u vscode sed -i '/^$/N;/^\n$/d' "$npmrc_file" 2>/dev/null || true
+            fi
+            
+            # Clear NVM prefix issues for all installed versions
             sudo -u vscode bash -c "
                 export NVM_DIR='$vscode_home/.nvm'
                 [ -s \"\$NVM_DIR/nvm.sh\" ] && \. \"\$NVM_DIR/nvm.sh\"
+                
+                # Clear prefix for all installed versions
+                nvm list --no-alias | grep -E '^[[:space:]]*v[0-9]' | while read -r version; do
+                    version=\$(echo \$version | tr -d '[:space:]')
+                    nvm use --delete-prefix \"\$version\" --silent 2>/dev/null || true
+                done
+                
+                # Set default and use LTS
                 nvm use --delete-prefix --lts --silent 2>/dev/null || true
                 nvm alias default lts/* 2>/dev/null || true
             " 2>/dev/null || true

@@ -1172,19 +1172,39 @@ main() {
     # Fix .npmrc conflicts for the development user
     local user_home="/home/$dev_user"
     local npmrc_file="$user_home/.npmrc"
-    
+
     if [[ -f "$npmrc_file" ]]; then
         # Backup original .npmrc
         cp "$npmrc_file" "$npmrc_file.backup.$(date +%Y%m%d_%H%M%S)" 2>/dev/null || true
-        
+
         # Remove conflicting settings
         sed -i '/^globalconfig/d' "$npmrc_file" 2>/dev/null || true
         sed -i '/^prefix/d' "$npmrc_file" 2>/dev/null || true
-        
+        sed -i '/^registry/d' "$npmrc_file" 2>/dev/null || true
+        sed -i '/^cache/d' "$npmrc_file" 2>/dev/null || true
+
         # Clean up empty lines
         sed -i '/^$/N;/^\n$/d' "$npmrc_file" 2>/dev/null || true
-        
+
         success "Fixed .npmrc configuration conflicts"
+    fi
+    
+    # Also fix .npmrc for vscode user
+    local vscode_npmrc="/home/vscode/.npmrc"
+    if [[ -f "$vscode_npmrc" ]]; then
+        # Backup original .npmrc
+        cp "$vscode_npmrc" "$vscode_npmrc.backup.$(date +%Y%m%d_%H%M%S)" 2>/dev/null || true
+
+        # Remove conflicting settings
+        sudo -u vscode sed -i '/^globalconfig/d' "$vscode_npmrc" 2>/dev/null || true
+        sudo -u vscode sed -i '/^prefix/d' "$vscode_npmrc" 2>/dev/null || true
+        sudo -u vscode sed -i '/^registry/d' "$vscode_npmrc" 2>/dev/null || true
+        sudo -u vscode sed -i '/^cache/d' "$vscode_npmrc" 2>/dev/null || true
+
+        # Clean up empty lines
+        sudo -u vscode sed -i '/^$/N;/^\n$/d' "$vscode_npmrc" 2>/dev/null || true
+
+        success "Fixed .npmrc configuration conflicts for vscode user"
     fi
     
     # Fix NVM prefix issues
@@ -1192,14 +1212,38 @@ main() {
         # Source NVM and clear prefix issues
         export NVM_DIR="$user_home/.nvm"
         source "$NVM_DIR/nvm.sh" 2>/dev/null || true
-        
-        # Clear prefix for current version
-        local current_version=$(nvm current 2>/dev/null || echo "none")
-        if [[ "$current_version" != "none" && "$current_version" != "system" ]]; then
-            nvm use --delete-prefix "$current_version" --silent 2>/dev/null || true
-        fi
-        
+
+        # Clear prefix for all installed versions
+        nvm list --no-alias | grep -E '^[[:space:]]*v[0-9]' | while read -r version; do
+            version=$(echo "$version" | tr -d '[:space:]')
+            nvm use --delete-prefix "$version" --silent 2>/dev/null || true
+        done
+
+        # Set default and use LTS
+        nvm use --delete-prefix --lts --silent 2>/dev/null || true
+        nvm alias default lts/* 2>/dev/null || true
+
         success "Fixed NVM prefix issues"
+    fi
+    
+    # Also fix NVM for vscode user
+    if [[ -s "/home/vscode/.nvm/nvm.sh" ]]; then
+        sudo -u vscode bash -c "
+            export NVM_DIR='/home/vscode/.nvm'
+            [ -s \"\$NVM_DIR/nvm.sh\" ] && \. \"\$NVM_DIR/nvm.sh\"
+            
+            # Clear prefix for all installed versions
+            nvm list --no-alias | grep -E '^[[:space:]]*v[0-9]' | while read -r version; do
+                version=\$(echo \$version | tr -d '[:space:]')
+                nvm use --delete-prefix \"\$version\" --silent 2>/dev/null || true
+            done
+            
+            # Set default and use LTS
+            nvm use --delete-prefix --lts --silent 2>/dev/null || true
+            nvm alias default lts/* 2>/dev/null || true
+        " 2>/dev/null || true
+
+        success "Fixed NVM prefix issues for vscode user"
     fi
     
     # Clean up npm global configuration
