@@ -90,7 +90,7 @@ test_update_functionality() {
 test_module_loading() {
     info "📦 Testing module loading..."
     
-    local modules=("php" "webserver" "database" "tunnel" "vscode" "project" "services" "uninstall" "proxy")
+    local modules=("php" "webserver" "database" "tunnel" "vscode" "project" "services" "uninstall")
     
     for module in "${modules[@]}"; do
         if [[ -f "modules/${module}.sh" ]]; then
@@ -170,45 +170,6 @@ test_docker_functionality() {
     fi
 }
 
-# Test NGINX Proxy Manager functionality
-test_npm_functionality() {
-    info "🌐 Testing NGINX Proxy Manager functionality..."
-    
-    # Test proxy module exists
-    if [[ -f "modules/proxy.sh" ]]; then
-        success "Proxy module exists"
-    else
-        error "Proxy module missing"
-    fi
-    
-    # Test proxy commands
-    if yads proxy status >/dev/null 2>&1; then
-        success "yads proxy status works"
-    else
-        warning "yads proxy status failed (expected if NPM not installed)"
-    fi
-    
-    # Test proxy installation
-    if yads proxy install >/dev/null 2>&1; then
-        success "yads proxy install works"
-    else
-        warning "yads proxy install failed (expected in container)"
-    fi
-    
-    # Test proxy setup
-    if yads proxy setup testdomain.com >/dev/null 2>&1; then
-        success "yads proxy setup works"
-    else
-        warning "yads proxy setup failed (expected in container)"
-    fi
-    
-    # Test proxy project creation
-    if yads proxy project testapp 8081 testapp.projects.testdomain.com >/dev/null 2>&1; then
-        success "yads proxy project works"
-    else
-        warning "yads proxy project failed (expected in container)"
-    fi
-}
 
 # Show test summary
 show_test_summary() {
@@ -219,7 +180,6 @@ show_test_summary() {
     info "Script permissions tests completed"
     info "Installation readiness tests completed"
     info "Docker functionality tests completed"
-    info "NGINX Proxy Manager tests completed"
     echo
     success "🎉 All tests completed!"
     echo
@@ -256,7 +216,6 @@ main() {
     test_docker_functionality
     echo
     
-    test_npm_functionality
     echo
     
     test_no_sudo_commands

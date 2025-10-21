@@ -265,11 +265,6 @@ test_yads_modules() {
         ((tests_passed++))
     fi
     
-    # Test yads proxy
-    ((tests_total++))
-    if test_command "yads proxy status" "yads proxy status command"; then
-        ((tests_passed++))
-    fi
     
     echo
     info "Module Commands: $tests_passed/$tests_total passed"
@@ -338,54 +333,6 @@ test_yads_functionality() {
     echo
 }
 
-# Test NGINX Proxy Manager functionality
-test_npm_functionality() {
-    info "🧪 Testing NGINX Proxy Manager Functionality"
-    echo "============================================="
-    
-    local tests_passed=0
-    local tests_total=0
-    
-    # Test proxy module exists
-    ((tests_total++))
-    if test_command "[[ -f modules/proxy.sh ]]" "Proxy module exists"; then
-        ((tests_passed++))
-    fi
-    
-    # Test proxy status command
-    ((tests_total++))
-    if test_command "yads proxy status" "yads proxy status command"; then
-        ((tests_passed++))
-    fi
-    
-    # Test proxy install command
-    ((tests_total++))
-    if test_command "yads proxy install" "yads proxy install command"; then
-        ((tests_passed++))
-    fi
-    
-    # Test proxy setup command
-    ((tests_total++))
-    if test_command "yads proxy setup testdomain.com" "yads proxy setup command"; then
-        ((tests_passed++))
-    fi
-    
-    # Test proxy vscode command
-    ((tests_total++))
-    if test_command "yads proxy vscode code-server.testdomain.com" "yads proxy vscode command"; then
-        ((tests_passed++))
-    fi
-    
-    # Test proxy project command
-    ((tests_total++))
-    if test_command "yads proxy project testapp 8081 testapp.projects.testdomain.com" "yads proxy project command"; then
-        ((tests_passed++))
-    fi
-    
-    echo
-    info "NPM Functionality Tests: $tests_passed/$tests_total passed"
-    echo
-}
 
 # Main test function
 main() {
@@ -418,7 +365,6 @@ main() {
     test_yads_services
     test_yads_configuration
     test_yads_modules
-    test_npm_functionality
     
     # Summary
     echo

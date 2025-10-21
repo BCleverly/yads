@@ -54,7 +54,6 @@ success() {
 create_project() {
     local project_name="$1"
     local project_type="${2:-php}"
-    local proxy_enabled="${3:-false}"
     local projects_dir="/var/www/projects"
     local project_dir="$projects_dir/$project_name"
     
@@ -115,28 +114,7 @@ create_project() {
     fi
     
     success "Project '$project_name' created at: $project_dir"
-    
-    # Configure proxy if enabled
-    if [[ "$proxy_enabled" == "true" ]]; then
-        info "🔧 Configuring NPM proxy for project..."
-        
-        # Get next available port
-        local port=$(get_next_available_port)
-        
-        # Start project on specific port
-        start_project_on_port "$project_name" "$port"
-        
-        # Add to NPM
-        if command -v yads >/dev/null 2>&1; then
-            yads proxy project "$project_name" "$port" "$project_name.projects.code-server.yourdomain.com"
-            success "Project proxy configured: https://$project_name.projects.code-server.yourdomain.com"
-        else
-            warning "YADS not found in PATH, skipping proxy configuration"
-            info "Run 'yads proxy project $project_name $port' to configure proxy"
-        fi
-    else
-        info "Access: http://$project_name.remote.domain.tld"
-    fi
+    info "Access: http://$project_name.remote.domain.tld"
 }
 
 # Create PHP project
@@ -302,37 +280,6 @@ list_projects() {
     done
 }
 
-# Get next available port
-get_next_available_port() {
-    local base_port=8081
-    local port=$base_port
-    
-    # Find next available port starting from 8081
-    while netstat -tuln 2>/dev/null | grep -q ":$port "; do
-        ((port++))
-    done
-    
-    echo $port
-}
-
-# Start project on specific port
-start_project_on_port() {
-    local project_name="$1"
-    local port="$2"
-    local project_dir="/var/www/projects/$project_name"
-    
-    info "Starting project on port $port..."
-    
-    # Create a simple PHP server for the project
-    if [[ -f "$project_dir/index.php" ]]; then
-        # Start PHP built-in server
-        nohup php -S localhost:$port -t "$project_dir" > "/var/log/yads-$project_name.log" 2>&1 &
-        echo $! > "/var/run/yads-$project_name.pid"
-        success "Project started on port $port"
-    else
-        warning "No index.php found in project directory"
-    fi
-}
 
 # Delete project
 delete_project() {
@@ -360,36 +307,23 @@ delete_project() {
 project_main() {
     setup_colors
     
-    # Check for --proxy flag
-    local proxy_enabled=false
-    local args=("$@")
-    
-    # Remove --proxy flag from arguments
-    for i in "${!args[@]}"; do
-        if [[ "${args[i]}" == "--proxy" ]]; then
-            proxy_enabled=true
-            unset 'args[i]'
-        fi
-    done
-    
-    case "${args[0]:-}" in
+    case "${1:-}" in
         "")
             list_projects
             info "Use 'yads project <name> [type]' to create a new project"
             info "Types: php, laravel, symfony, wordpress"
-            info "Add --proxy flag to automatically configure NPM routes"
             ;;
         list)
             list_projects
             ;;
         delete)
-            if [[ -z "${args[1]:-}" ]]; then
+            if [[ -z "${2:-}" ]]; then
                 error_exit "Project name required for deletion"
             fi
-            delete_project "${args[1]}"
+            delete_project "$2"
             ;;
         *)
-            create_project "${args[0]}" "${args[1]:-php}" "$proxy_enabled"
+            create_project "$1" "${2:-php}"
             ;;
     esac
 }

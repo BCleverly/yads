@@ -24,8 +24,6 @@ RUN apt-get update && apt-get install -y \
     apt-transport-https \
     dos2unix \
     acl \
-    net-tools \
-    netstat-nat \
     && rm -rf /var/lib/apt/lists/*
 
 # Create test users
@@ -163,7 +161,7 @@ echo
 info "📦 2. Module Loading Tests"
 echo "=========================="
 
-local modules=("php" "webserver" "database" "tunnel" "vscode" "project" "services" "uninstall" "proxy")
+local modules=("php" "webserver" "database" "tunnel" "vscode" "project" "services" "uninstall")
 for module in "${modules[@]}"; do
     test_command "[[ -f modules/${module}.sh ]] && [[ -x modules/${module}.sh ]]" "Module ${module}.sh exists and is executable"
 done
@@ -233,8 +231,6 @@ test_command "yads php 8.4" "yads php command"
 test_command "yads server nginx" "yads server command"
 test_command "yads database mysql" "yads database command"
 test_command "yads vscode status" "yads vscode status"
-test_command "yads proxy status" "yads proxy status command"
-test_command "yads proxy install" "yads proxy install command"
 
 echo
 
@@ -254,21 +250,9 @@ echo "==================="
 
 test_command "curl -s --connect-timeout 5 http://localhost:8080 >/dev/null || true" "VS Code Server port test"
 test_command "curl -s --connect-timeout 5 http://localhost:80 >/dev/null || true" "Web server port test"
-test_command "curl -s --connect-timeout 5 http://localhost:81 >/dev/null || true" "NGINX Proxy Manager port test"
 
 echo
 
-# 11. NGINX Proxy Manager Tests
-info "🌐 11. NGINX Proxy Manager Tests"
-echo "==============================="
-
-test_command "yads proxy status" "NPM status check"
-test_command "yads proxy install" "NPM installation"
-test_command "yads proxy setup testdomain.com" "NPM standard routes setup"
-test_command "yads proxy vscode code-server.testdomain.com" "VS Code Server proxy setup"
-test_command "yads proxy project testapp 8081 testapp.projects.testdomain.com" "Project proxy setup"
-
-echo
 
 # Show test summary
 info "📊 Test Summary"
@@ -341,7 +325,7 @@ ENV PATH="/home/yadsuser/.local/bin:$PATH"
 ENV HOME="/home/yadsuser"
 
 # Expose ports for services
-EXPOSE 80 443 8080 8081 81 3306 5432 6379
+EXPOSE 80 443 8080 3306 5432 6379
 
 # Create enhanced entrypoint script
 RUN cat > /home/yadsuser/entrypoint.sh << 'EOF'
@@ -365,8 +349,6 @@ echo "  ./fix-permissions-docker.sh   - Fix permissions in container"
 echo "  sudo ./install.sh             - Install YADS system-wide"
 echo "  yads help                     - Show YADS help"
 echo "  yads status                   - Check YADS status"
-echo "  yads proxy status             - Check NPM status"
-echo "  yads proxy install            - Install NGINX Proxy Manager"
 echo
 
 echo "Testing Environment:"

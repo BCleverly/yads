@@ -160,7 +160,6 @@ show_help() {
     echo -e "${WHITE}  tunnel dashboard         Show Cloudflare dashboard setup help${NC}"
     echo -e "${WHITE}  vscode                  Configure VS Code Server${NC}"
     echo -e "${WHITE}  project <name>          Create new project${NC}"
-    echo -e "${WHITE}  proxy                   Manage NGINX Proxy Manager${NC}"
     echo -e "${WHITE}  help                    Show this help message${NC}"
     echo -e "${WHITE}  version                 Show version information${NC}"
     echo -e "${WHITE}  update                  Update YADS to latest version${NC}"
@@ -254,10 +253,6 @@ main() {
         project)
             source_module "project"
             project_main "$@"
-            ;;
-        proxy)
-            source_module "proxy"
-            proxy_main "$@"
             ;;
         *)
             error_exit "Unknown command: $command. Use 'yads help' for available commands."

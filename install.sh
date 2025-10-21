@@ -559,70 +559,6 @@ install_gh_cli() {
     success "GitHub CLI installed"
 }
 
-# Install NGINX Proxy Manager
-install_npm() {
-    info "🌐 Installing NGINX Proxy Manager..."
-    
-    # Check if Node.js is installed
-    if ! command -v node >/dev/null 2>&1; then
-        error_exit "Node.js is not installed. This should not happen."
-    fi
-    
-    # Create NPM user
-    if ! id npm >/dev/null 2>&1; then
-        useradd -r -s /bin/bash -d /opt/npm -m npm
-        success "Created npm user"
-    fi
-    
-    # Create NPM directories
-    mkdir -p /opt/npm/{data,letsencrypt,logs}
-    chown -R npm:npm /opt/npm
-    
-    # Install NPM using Docker (recommended method)
-    info "Installing NGINX Proxy Manager using Docker..."
-    
-    # Create NPM directories
-    mkdir -p /opt/npm/{data,letsencrypt,logs}
-    chown -R npm:npm /opt/npm
-    
-    # Run NPM using Docker
-    docker run -d \
-        --name=npm \
-        --restart=unless-stopped \
-        -p 80:80 \
-        -p 81:81 \
-        -p 443:443 \
-        -v /opt/npm/data:/data \
-        -v /opt/npm/letsencrypt:/etc/letsencrypt \
-        jc21/nginx-proxy-manager:latest
-    
-    # Create systemd service for Docker container
-    cat > /etc/systemd/system/npm.service << 'EOF'
-[Unit]
-Description=NGINX Proxy Manager (Docker)
-After=docker.service
-Requires=docker.service
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/bin/docker start npm
-ExecStop=/usr/bin/docker stop npm
-TimeoutStartSec=0
-
-[Install]
-WantedBy=multi-user.target
-EOF
-    
-    # Start and enable service
-    systemctl daemon-reload
-    systemctl enable npm
-    systemctl start npm
-    
-    success "NGINX Proxy Manager installed"
-    info "Admin panel: http://localhost:81"
-    info "Default login: admin@example.com / changeme"
-}
 
 # Install Cursor CLI
 install_cursor_cli() {
@@ -1142,7 +1078,6 @@ main() {
     install_databases
     install_gh_cli
     install_cursor_cli
-    install_npm
     create_yads_structure
     configure_firewall
     
