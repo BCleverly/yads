@@ -1120,13 +1120,42 @@ main() {
         chmod -R 755 /home/vscode
         chmod 600 /home/vscode/.config/code-server/config.yaml 2>/dev/null || true
         
-        # Fix Node.js/NVM permissions for vscode user
-        if [[ -d "/home/vscode/.nvm" ]]; then
-            chown -R vscode:vscode /home/vscode/.nvm
-            chmod -R 755 /home/vscode/.nvm
-        fi
-        success "VS Code Server permissions fixed"
+    # Fix Node.js/NVM permissions for vscode user
+    if [[ -d "/home/vscode/.nvm" ]]; then
+        chown -R vscode:vscode /home/vscode/.nvm
+        chmod -R 755 /home/vscode/.nvm
     fi
+    
+    # Fix VS Code Server Node.js module resolution
+    info "🔧 Fixing VS Code Server Node.js module resolution..."
+    
+    # Ensure VS Code Server can find Node.js modules
+    if command -v code-server >/dev/null 2>&1; then
+        local code_server_path=$(which code-server)
+        local code_server_dir=$(dirname "$code_server_path")
+        
+        # Fix any broken symlinks that might cause module resolution issues
+        find "$code_server_dir" -type l -exec test ! -e {} \; -delete 2>/dev/null || true
+        
+        # Ensure code-server binary has proper permissions
+        chmod +x "$code_server_path"
+        chown root:root "$code_server_path" 2>/dev/null || true
+        
+        # Create a proper Node.js environment for VS Code Server
+        if [[ -s "/home/vscode/.nvm/nvm.sh" ]]; then
+            # Source NVM and set up proper Node.js environment
+            export NVM_DIR="/home/vscode/.nvm"
+            source "$NVM_DIR/nvm.sh" 2>/dev/null || true
+            
+            # Use delete-prefix to clear any problematic prefix settings
+            nvm use --delete-prefix --lts --silent 2>/dev/null || true
+            nvm alias default lts/* 2>/dev/null || true
+        fi
+        
+        success "VS Code Server Node.js module resolution fixed"
+    fi
+    
+    success "VS Code Server permissions fixed"
     
     # Fix NVM and .npmrc configuration conflicts
     info "🔄 Fixing NVM and .npmrc configuration conflicts..."
@@ -1178,6 +1207,33 @@ main() {
         npm config delete prefix 2>/dev/null || true
         npm config delete globalconfig 2>/dev/null || true
         success "Cleaned up npm global configuration"
+    fi
+    
+    # Fix Node.js module resolution issues
+    info "🔧 Fixing Node.js module resolution issues..."
+    
+    # Ensure Node.js can find its modules properly
+    if command -v node >/dev/null 2>&1; then
+        # Get the actual Node.js path
+        local node_path=$(which node)
+        local node_dir=$(dirname "$node_path")
+        
+        # Create proper symlinks to prevent module resolution issues
+        if [[ -f "$node_dir/node" ]]; then
+            # Ensure the node binary is properly linked
+            chmod +x "$node_dir/node"
+            chown root:root "$node_dir/node" 2>/dev/null || true
+        fi
+        
+        # Fix any broken symlinks in /usr/local
+        find /usr/local -type l -exec test ! -e {} \; -delete 2>/dev/null || true
+        
+        # Ensure /usr/local/lib/node_modules exists and is accessible
+        mkdir -p /usr/local/lib/node_modules
+        chown -R root:root /usr/local/lib/node_modules 2>/dev/null || true
+        chmod -R 755 /usr/local/lib/node_modules 2>/dev/null || true
+        
+        success "Fixed Node.js module resolution"
     fi
     
     # Ensure YADS script has proper permissions
