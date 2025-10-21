@@ -73,25 +73,37 @@ install_npm() {
     mkdir -p /opt/npm/{data,letsencrypt,logs}
     chown -R npm:npm /opt/npm
     
-    # Install NPM globally
-    info "Installing NGINX Proxy Manager..."
-    npm install -g nginx-proxy-manager
+    # Install NPM using Docker (recommended method)
+    info "Installing NGINX Proxy Manager using Docker..."
     
-    # Create systemd service
+    # Create NPM directories
+    mkdir -p /opt/npm/{data,letsencrypt,logs}
+    chown -R npm:npm /opt/npm
+    
+    # Run NPM using Docker
+    docker run -d \
+        --name=npm \
+        --restart=unless-stopped \
+        -p 80:80 \
+        -p 81:81 \
+        -p 443:443 \
+        -v /opt/npm/data:/data \
+        -v /opt/npm/letsencrypt:/etc/letsencrypt \
+        jc21/nginx-proxy-manager:latest
+    
+    # Create systemd service for Docker container
     cat > /etc/systemd/system/npm.service << 'EOF'
 [Unit]
-Description=NGINX Proxy Manager
-After=network.target
+Description=NGINX Proxy Manager (Docker)
+After=docker.service
+Requires=docker.service
 
 [Service]
-Type=simple
-User=npm
-WorkingDirectory=/opt/npm
-ExecStart=/usr/bin/npm start
-Restart=always
-RestartSec=10
-StandardOutput=journal
-StandardError=journal
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/docker start npm
+ExecStop=/usr/bin/docker stop npm
+TimeoutStartSec=0
 
 [Install]
 WantedBy=multi-user.target
