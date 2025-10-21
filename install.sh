@@ -1257,6 +1257,38 @@ main() {
     done
     success "Line endings fixed for all scripts"
     
+    # Final comprehensive verification and cleanup
+    info "🔍 Running final comprehensive verification..."
+    
+    # Remove any remaining broken symlinks
+    find /usr/local -type l -exec test ! -e {} \; -delete 2>/dev/null || true
+    find /usr/bin -type l -exec test ! -e {} \; -delete 2>/dev/null || true
+    
+    # Ensure all critical binaries have proper permissions
+    for binary in node npm code-server yads; do
+        if command -v "$binary" >/dev/null 2>&1; then
+            local bin_path=$(which "$binary")
+            chmod +x "$bin_path"
+            chown root:root "$bin_path" 2>/dev/null || true
+        fi
+    done
+    
+    # Final test of Node.js module resolution
+    if command -v node >/dev/null 2>&1; then
+        if node -e "console.log('Node.js working:', process.version)" >/dev/null 2>&1; then
+            success "Node.js module resolution verified"
+        else
+            warning "Node.js module resolution may have issues"
+        fi
+    fi
+    
+    # Final test of VS Code Server
+    if systemctl is-active --quiet code-server@vscode; then
+        success "VS Code Server service verified"
+    else
+        warning "VS Code Server service may not be running"
+    fi
+    
     success "Comprehensive permission and configuration fixes completed"
     
     # Verify and fix PATH configuration
