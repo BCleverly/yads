@@ -559,6 +559,59 @@ install_gh_cli() {
     success "GitHub CLI installed"
 }
 
+# Install NGINX Proxy Manager
+install_npm() {
+    info "🌐 Installing NGINX Proxy Manager..."
+    
+    # Check if Node.js is installed
+    if ! command -v node >/dev/null 2>&1; then
+        error_exit "Node.js is not installed. This should not happen."
+    fi
+    
+    # Create NPM user
+    if ! id npm >/dev/null 2>&1; then
+        useradd -r -s /bin/bash -d /opt/npm -m npm
+        success "Created npm user"
+    fi
+    
+    # Create NPM directories
+    mkdir -p /opt/npm/{data,letsencrypt,logs}
+    chown -R npm:npm /opt/npm
+    
+    # Install NPM globally
+    info "Installing NGINX Proxy Manager..."
+    npm install -g nginx-proxy-manager
+    
+    # Create systemd service
+    cat > /etc/systemd/system/npm.service << 'EOF'
+[Unit]
+Description=NGINX Proxy Manager
+After=network.target
+
+[Service]
+Type=simple
+User=npm
+WorkingDirectory=/opt/npm
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    
+    # Start and enable service
+    systemctl daemon-reload
+    systemctl enable npm
+    systemctl start npm
+    
+    success "NGINX Proxy Manager installed"
+    info "Admin panel: http://localhost:81"
+    info "Default login: admin@example.com / changeme"
+}
+
 # Install Cursor CLI
 install_cursor_cli() {
     info "🎯 Installing Cursor CLI..."
@@ -1077,6 +1130,7 @@ main() {
     install_databases
     install_gh_cli
     install_cursor_cli
+    install_npm
     create_yads_structure
     configure_firewall
     

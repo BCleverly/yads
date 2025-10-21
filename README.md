@@ -103,6 +103,16 @@ yads tunnel stop     # Stop tunnel
 yads tunnel status   # Show tunnel status
 ```
 
+### 🌐 NGINX Proxy Manager
+```bash
+yads proxy install                    # Install NGINX Proxy Manager
+yads proxy status                     # Show NPM status
+yads proxy vscode domain.tld         # Setup VS Code Server proxy
+yads proxy project name port domain  # Add project proxy
+yads proxy add domain target port    # Add custom proxy host
+yads proxy ssl domain                # Enable SSL for domain
+```
+
 ### 💻 VS Code Server
 ```bash
 yads vscode setup    # Configure VS Code Server
@@ -117,6 +127,7 @@ yads project myapp              # Create basic PHP project
 yads project myapp laravel       # Create Laravel project
 yads project myapp symfony       # Create Symfony project
 yads project myapp wordpress     # Create WordPress project
+yads project myapp laravel --proxy  # Create with proxy setup
 yads project list               # List all projects
 ```
 
@@ -140,32 +151,145 @@ yads project list               # List all projects
 ```
 
 ### 🌐 Service Architecture
+- **NGINX Proxy Manager**: `localhost:81` (proxy management)
 - **VS Code Server**: `localhost:8080` (authenticated)
 - **Web Server**: `localhost:80` (Apache/Nginx/FrankenPHP)
 - **Cloudflared**: Secure tunnel to internet
 - **Databases**: MySQL, PostgreSQL, Redis
 
-### 🔗 Domain Routing
-- `code.yourdomain.com` → VS Code Server
-- `myapp.yourdomain.com` → `/var/www/projects/myapp`
-- `blog.yourdomain.com` → `/var/www/projects/blog`
+### 🔗 Domain Routing with NPM
+- `code-server.yourdomain.com` → VS Code Server
+- `proxy-manager.code-server.yourdomain.com` → NPM Admin
+- `phpmyadmin.code-server.yourdomain.com` → phpMyAdmin
+- `projects.code-server.yourdomain.com` → Projects List
+- `myapp.projects.code-server.yourdomain.com` → Laravel Project
+- `blog.projects.code-server.yourdomain.com` → WordPress Project
 
 ## ⚙️ Configuration
 
 ### 💻 VS Code Server Setup
-1. **Access**: `http://localhost:8080` or `https://code.yourdomain.com`
+1. **Access**: `http://localhost:8080` or `https://code-server.yourdomain.com`
 2. **Password**: Generated during installation (stored in `/opt/vscode-server/.password`)
 3. **Change Password**: `yads vscode password`
 
-### 🔗 Cloudflared Tunnel Setup
+### 🔗 Cloudflared Tunnel Setup with NGINX Proxy Manager
 1. **Configure**: `yads tunnel setup`
 2. **Login**: Browser opens to Cloudflare dashboard
 3. **DNS**: Configure your domain DNS records
-4. **Access**: `https://code.yourdomain.com`
+4. **Access**: `https://code-server.yourdomain.com`
+
+#### 🌐 Domain Structure
+- **VS Code Server**: `https://code-server.yourdomain.com`
+- **NGINX Proxy Manager**: `https://proxy-manager.code-server.yourdomain.com`
+- **phpMyAdmin**: `https://phpmyadmin.code-server.yourdomain.com`
+- **Projects**: `https://project1.projects.code-server.yourdomain.com`
+- **Projects List**: `https://projects.code-server.yourdomain.com` (password protected)
 
 ### 📁 Project Access
 - **Local**: `http://localhost/myapp`
-- **Internet**: `https://myapp.yourdomain.com`
+- **Internet**: `https://project1.projects.code-server.yourdomain.com`
+
+## 🌐 NGINX Proxy Manager Integration
+
+### 🚀 Quick Setup
+```bash
+# Install YADS (automatically installs NPM and configures proxies)
+sudo ./install.sh
+
+# Configure tunnel for NPM (auto-configures all standard routes)
+yads tunnel setup yourdomain.com
+
+# Create project with proxy
+yads project myapp laravel --proxy
+```
+
+#### 🎯 **Automatic Configuration**
+When you run `yads tunnel setup`, it automatically configures:
+- **VS Code Server**: `code-server.yourdomain.com` → `localhost:8080`
+- **NPM Admin**: `proxy-manager.code-server.yourdomain.com` → `localhost:81`
+- **phpMyAdmin**: `phpmyadmin.code-server.yourdomain.com` → `localhost:8080/phpmyadmin`
+- **Projects List**: `projects.code-server.yourdomain.com` → `localhost:8080/projects`
+
+#### 🔧 **What Happens Automatically:**
+1. **NPM Installation**: Installs NGINX Proxy Manager during YADS installation
+2. **Tunnel Configuration**: Sets up Cloudflare tunnel to point to `localhost:81`
+3. **Proxy Routes**: Automatically creates all standard proxy routes
+4. **SSL Setup**: Configures Let's Encrypt certificates for all domains
+5. **Service Integration**: Links all YADS services to their respective domains
+
+### 🔧 Domain Configuration
+
+#### **Main Services**
+- **VS Code Server**: `https://code-server.yourdomain.com`
+  - Routes to: `localhost:8080`
+  - SSL: Automatic Let's Encrypt
+  - WebSocket: Enabled for VS Code
+
+#### **Management Tools**
+- **NGINX Proxy Manager**: `https://proxy-manager.code-server.yourdomain.com`
+  - Routes to: `localhost:81`
+  - Admin interface for proxy management
+  - SSL certificate management
+
+- **phpMyAdmin**: `https://phpmyadmin.code-server.yourdomain.com`
+  - Routes to: `localhost:8080/phpmyadmin`
+  - Database management interface
+
+#### **Project Structure**
+- **Projects List**: `https://projects.code-server.yourdomain.com`
+  - Password protected project directory
+  - Simple PHP script listing all projects
+  - Authentication: Basic HTTP Auth
+
+- **Individual Projects**:
+  - `https://project1.projects.code-server.yourdomain.com`
+  - `https://project2.projects.code-server.yourdomain.com`
+  - `https://laravel-app.projects.code-server.yourdomain.com`
+
+### 🔐 Security Features
+- **SSL Termination**: Automatic Let's Encrypt certificates
+- **Access Control**: Basic HTTP authentication for sensitive areas
+- **Rate Limiting**: Built-in protection against abuse
+- **WebSocket Support**: Full VS Code Server functionality
+- **Custom Headers**: Security headers and CORS configuration
+
+### 📊 Monitoring & Management
+- **Real-time Logs**: Access logs for all services
+- **SSL Certificate Monitoring**: Automatic renewal tracking
+- **Performance Metrics**: Request/response statistics
+- **Health Checks**: Service availability monitoring
+
+## 🚀 Complete Setup Example
+
+### **Step 1: Install YADS (Auto-configures NPM)**
+```bash
+# Install YADS (automatically installs and configures NPM)
+sudo ./install.sh
+```
+
+### **Step 2: Configure Tunnel (Auto-configures all proxies)**
+```bash
+# Configure tunnel - automatically sets up all standard routes
+yads tunnel setup yourdomain.com
+```
+
+### **Step 3: Create Projects**
+```bash
+# Create Laravel project with proxy
+yads project myapp laravel --proxy
+# Results in: https://myapp.projects.code-server.yourdomain.com
+
+# Create WordPress project with proxy
+yads project blog wordpress --proxy
+# Results in: https://blog.projects.code-server.yourdomain.com
+```
+
+### **Step 4: Access Your Services (All Auto-configured)**
+- **VS Code Server**: `https://code-server.yourdomain.com` ✅ Auto-configured
+- **Proxy Manager**: `https://proxy-manager.code-server.yourdomain.com` ✅ Auto-configured
+- **phpMyAdmin**: `https://phpmyadmin.code-server.yourdomain.com` ✅ Auto-configured
+- **Projects List**: `https://projects.code-server.yourdomain.com` ✅ Auto-configured
+- **Your Projects**: `https://myapp.projects.code-server.yourdomain.com` ✅ Auto-configured
 
 ## 📋 Prerequisites
 

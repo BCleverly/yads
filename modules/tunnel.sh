@@ -103,8 +103,8 @@ setup_tunnel() {
     info "Tunnel ID: $tunnel_id"
     info "Credentials saved to: /root/.cloudflared/$tunnel_id.json"
     
-    # Create tunnel configuration with proper permissions
-    info "📝 Creating tunnel configuration..."
+    # Create tunnel configuration pointing to NPM
+    info "📝 Creating tunnel configuration for NPM..."
     if [[ $EUID -eq 0 ]]; then
         # Running as root
         cat > /etc/cloudflared/config.yml << EOF
@@ -112,15 +112,9 @@ tunnel: $tunnel_id
 credentials-file: /root/.cloudflared/$tunnel_id.json
 
 ingress:
-  # VS Code Server
-  - hostname: code.remote.domain.tld
-    service: http://localhost:8080
-    originRequest:
-      noTLSVerify: true
-  
-  # Wildcard for projects
-  - hostname: "*.remote.domain.tld"
-    service: http://localhost:80
+  # All traffic goes to NPM
+  - hostname: "*.$domain"
+    service: http://localhost:81
     originRequest:
       noTLSVerify: true
   
@@ -134,15 +128,9 @@ tunnel: $tunnel_id
 credentials-file: /root/.cloudflared/$tunnel_id.json
 
 ingress:
-  # VS Code Server
-  - hostname: code.remote.domain.tld
-    service: http://localhost:8080
-    originRequest:
-      noTLSVerify: true
-  
-  # Wildcard for projects
-  - hostname: "*.remote.domain.tld"
-    service: http://localhost:80
+  # All traffic goes to NPM
+  - hostname: "*.$domain"
+    service: http://localhost:81
     originRequest:
       noTLSVerify: true
   
@@ -221,6 +209,15 @@ EOF
         sudo systemctl daemon-reload
         sudo systemctl enable cloudflared
         sudo systemctl start cloudflared
+    fi
+    
+    # Auto-configure NPM routes
+    info "🔧 Auto-configuring NPM routes..."
+    if command -v yads >/dev/null 2>&1; then
+        yads proxy setup "$domain"
+    else
+        warning "YADS not found in PATH, skipping NPM auto-configuration"
+        info "Run 'yads proxy setup $domain' to configure NPM routes"
     fi
     
     success "🎉 Cloudflared tunnel configured successfully!"
