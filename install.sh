@@ -267,53 +267,61 @@ EOF
 install_vscode_server() {
     info "💻 Installing VS Code Server..."
     
-    local vscode_dir="/opt/vscode-server"
     local vscode_user="vscode"
     
     # Create vscode user
     if ! id "$vscode_user" >/dev/null 2>&1; then
-        useradd -r -s /bin/bash -d "$vscode_dir" -m "$vscode_user"
+        useradd -r -s /bin/bash -d "/home/$vscode_user" -m "$vscode_user"
     fi
     
-    # Create vscode directory
-    mkdir -p "$vscode_dir"
-    chown -R "$vscode_user:$vscode_user" "$vscode_dir"
+    # Install required build dependencies for code-server
+    info "📦 Installing build dependencies for code-server..."
     
-    # Ensure NVM is available for vscode user
-    info "Setting up NVM for vscode user..."
-    sudo -u "$vscode_user" bash -c '
-        export NVM_DIR="/opt/vscode-server/.nvm"
-        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
-        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-        nvm install --lts || nvm install node
-        nvm use --lts || nvm use node
-    ' || warning "NVM setup for vscode user had issues, but continuing..."
+    if command -v apt-get >/dev/null 2>&1; then
+        # Ubuntu/Debian
+        apt-get update
+        apt-get install -y build-essential pkg-config python3
+        npm config set python python3
+    elif command -v yum >/dev/null 2>&1; then
+        # Fedora/CentOS/RHEL
+        yum groupinstall -y 'Development Tools'
+        yum config-manager --set-enabled PowerTools 2>/dev/null || true
+        yum install -y python2
+        npm config set python python2
+    elif command -v dnf >/dev/null 2>&1; then
+        # Fedora (newer)
+        dnf groupinstall -y 'Development Tools'
+        dnf install -y python3 pkg-config
+        npm config set python python3
+    fi
     
-    # Create system-wide Node.js symlinks for VS Code Server
-    info "Creating system-wide Node.js symlinks..."
-    local vscode_node_path
-    vscode_node_path=$(sudo -u "$vscode_user" bash -c 'export NVM_DIR="/opt/vscode-server/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"; which node' 2>/dev/null || echo "")
+    # Install Node.js 22.x (required by code-server)
+    info "📦 Installing Node.js 22.x for code-server..."
     
-    if [[ -n "$vscode_node_path" ]] && [[ -f "$vscode_node_path" ]]; then
-        # Create symlinks for system-wide access
-        ln -sf "$vscode_node_path" /usr/local/bin/node
-        ln -sf "$(dirname "$vscode_node_path")/npm" /usr/local/bin/npm 2>/dev/null || true
-        
-        # Create the directory that code-server expects
-        mkdir -p /usr/local/lib
-        ln -sf "$vscode_node_path" /usr/local/lib/node
-        
-        success "Node.js symlinks created for VS Code Server"
+    # Use NodeSource repository for Node.js 22.x
+    if command -v apt-get >/dev/null 2>&1; then
+        curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+        apt-get install -y nodejs
+    elif command -v yum >/dev/null 2>&1; then
+        curl -fsSL https://rpm.nodesource.com/setup_22.x | bash -
+        yum install -y nodejs
+    elif command -v dnf >/dev/null 2>&1; then
+        curl -fsSL https://rpm.nodesource.com/setup_22.x | bash -
+        dnf install -y nodejs
+    fi
+    
+    # Verify Node.js version
+    local node_version
+    node_version=$(node --version 2>/dev/null || echo "none")
+    if [[ "$node_version" =~ ^v22\. ]]; then
+        success "Node.js $node_version installed (correct version for code-server)"
     else
-        warning "Could not find Node.js for vscode user, VS Code Server may not work properly"
+        warning "Node.js version $node_version may not be compatible with code-server"
     fi
     
-    # Install VS Code Server using official install script
-    info "Installing VS Code Server using official install script..."
-    
-    # Use the official code-server install script
-    # This handles all the complexity and follows their recommended approach
-    curl -fsSL https://code-server.dev/install.sh | sh
+    # Install code-server using npm (as per official docs)
+    info "📦 Installing code-server via npm..."
+    npm install --global code-server
     
     # Verify installation
     if ! command -v code-server >/dev/null 2>&1; then
@@ -322,32 +330,8 @@ install_vscode_server() {
     
     success "VS Code Server installed successfully"
     
-    # Follow official code-server installation approach
-    # The official install script creates a user service, so we'll do the same
-    # But we need to set up the vscode user properly first
-    
-    # Create vscode user's home directory and config
-    mkdir -p "/home/$vscode_user/.config"
-    chown -R "$vscode_user:$vscode_user" "/home/$vscode_user"
-    
-    # Set up NVM for vscode user in their home directory
-    info "Setting up NVM for vscode user..."
-    sudo -u "$vscode_user" bash -c '
-        # Create NVM directory first
-        mkdir -p /home/vscode/.nvm
-        
-        # Install NVM
-        export NVM_DIR="/home/vscode/.nvm"
-        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
-        
-        # Source NVM and install Node.js
-        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-        nvm install --lts || nvm install node
-        nvm use --lts || nvm use node
-        nvm alias default lts/* || nvm alias default node
-    ' || warning "NVM setup for vscode user had issues, but continuing..."
-    
     # Create VS Code Server configuration for vscode user
+    info "🔧 Configuring VS Code Server..."
     sudo -u "$vscode_user" mkdir -p "/home/$vscode_user/.config/code-server"
     
     # Generate password for vscode user
@@ -366,7 +350,26 @@ EOF
     chown "$vscode_user:$vscode_user" "/home/$vscode_user/.config/code-server/config.yaml"
     chmod 600 "/home/$vscode_user/.config/code-server/config.yaml"
     
-    # Enable and start the official user service
+    # Create systemd service for code-server
+    info "🔧 Creating systemd service for code-server..."
+    tee /etc/systemd/system/code-server@.service > /dev/null << EOF
+[Unit]
+Description=code-server
+After=network.target
+
+[Service]
+Type=simple
+User=%i
+Environment=PATH=/usr/bin:/usr/local/bin
+ExecStart=/usr/local/bin/code-server --bind-addr 0.0.0.0:8080
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    
+    # Reload systemd and enable service
+    systemctl daemon-reload
     systemctl enable "code-server@$vscode_user"
     systemctl start "code-server@$vscode_user"
     
@@ -376,15 +379,7 @@ EOF
     chmod -R 755 "/home/$vscode_user"
     chmod 600 "/home/$vscode_user/.config/code-server/config.yaml"
     
-    # Fix any Node.js permission issues
-    if [[ -d "/home/$vscode_user/.nvm" ]]; then
-        chown -R "$vscode_user:$vscode_user" "/home/$vscode_user/.nvm"
-        chmod -R 755 "/home/$vscode_user/.nvm"
-    fi
-    
-    success "VS Code Server permissions fixed"
-    
-    success "VS Code Server installed"
+    success "VS Code Server installed and configured"
     info "VS Code Server password: $password"
     info "VS Code Server will be accessible at: http://localhost:8080"
 }
@@ -1091,7 +1086,6 @@ main() {
     
     update_system
     install_docker
-    install_nodejs
     install_vscode_server
     install_cloudflared
     install_php
