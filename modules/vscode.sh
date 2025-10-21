@@ -61,6 +61,13 @@ check_vscode_server() {
 fix_node_module_resolution() {
     info "🔧 Fixing Node.js module resolution issues..."
     
+    # Check if running as root or with sudo
+    if [[ $EUID -ne 0 ]]; then
+        warning "VS Code Server module requires root privileges for system fixes"
+        warning "Please run: sudo yads vscode setup"
+        return 1
+    fi
+    
     # Fix /usr/local permissions
     chown -R root:root /usr/local 2>/dev/null || true
     chmod -R 755 /usr/local 2>/dev/null || true
@@ -72,14 +79,18 @@ fix_node_module_resolution() {
     # Fix Node.js and npm permissions
     if command -v node >/dev/null 2>&1; then
         local node_path=$(which node)
-        chmod +x "$node_path"
-        chown root:root "$node_path" 2>/dev/null || true
+        if [[ -f "$node_path" ]]; then
+            chmod +x "$node_path" 2>/dev/null || warning "Could not change permissions for $node_path"
+            chown root:root "$node_path" 2>/dev/null || warning "Could not change ownership for $node_path"
+        fi
     fi
     
     if command -v npm >/dev/null 2>&1; then
         local npm_path=$(which npm)
-        chmod +x "$npm_path"
-        chown root:root "$npm_path" 2>/dev/null || true
+        if [[ -f "$npm_path" ]]; then
+            chmod +x "$npm_path" 2>/dev/null || warning "Could not change permissions for $npm_path"
+            chown root:root "$npm_path" 2>/dev/null || warning "Could not change ownership for $npm_path"
+        fi
         
         # Clear npm configuration issues
         npm cache clean --force 2>/dev/null || true
@@ -90,8 +101,10 @@ fix_node_module_resolution() {
     # Fix VS Code Server binary permissions
     if command -v code-server >/dev/null 2>&1; then
         local code_server_path=$(which code-server)
-        chmod +x "$code_server_path"
-        chown root:root "$code_server_path" 2>/dev/null || true
+        if [[ -f "$code_server_path" ]]; then
+            chmod +x "$code_server_path" 2>/dev/null || warning "Could not change permissions for $code_server_path"
+            chown root:root "$code_server_path" 2>/dev/null || warning "Could not change ownership for $code_server_path"
+        fi
         
         # Remove broken symlinks around code-server
         local code_server_dir=$(dirname "$code_server_path")
@@ -143,7 +156,9 @@ configure_vscode() {
     info "💻 Configuring VS Code Server..."
     
     # Fix Node.js module resolution first
-    fix_node_module_resolution
+    if ! fix_node_module_resolution; then
+        warning "Some system fixes failed, but continuing with VS Code Server setup..."
+    fi
     
     check_vscode_server
     
@@ -236,7 +251,9 @@ start_vscode() {
     info "🚀 Starting VS Code Server..."
     
     # Fix Node.js module resolution first
-    fix_node_module_resolution
+    if ! fix_node_module_resolution; then
+        warning "Some system fixes failed, but continuing with VS Code Server start..."
+    fi
     
     check_vscode_server
     
