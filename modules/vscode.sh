@@ -57,9 +57,73 @@ check_vscode_server() {
     fi
 }
 
+# Fix Node.js module resolution issues
+fix_node_module_resolution() {
+    info "🔧 Fixing Node.js module resolution issues..."
+    
+    # Fix /usr/local permissions
+    chown -R root:root /usr/local 2>/dev/null || true
+    chmod -R 755 /usr/local 2>/dev/null || true
+    
+    # Remove broken symlinks
+    find /usr/local -type l -exec test ! -e {} \; -delete 2>/dev/null || true
+    find /usr/bin -type l -exec test ! -e {} \; -delete 2>/dev/null || true
+    
+    # Fix Node.js and npm permissions
+    if command -v node >/dev/null 2>&1; then
+        local node_path=$(which node)
+        chmod +x "$node_path"
+        chown root:root "$node_path" 2>/dev/null || true
+    fi
+    
+    if command -v npm >/dev/null 2>&1; then
+        local npm_path=$(which npm)
+        chmod +x "$npm_path"
+        chown root:root "$npm_path" 2>/dev/null || true
+        
+        # Clear npm configuration issues
+        npm cache clean --force 2>/dev/null || true
+        npm config delete prefix 2>/dev/null || true
+        npm config delete globalconfig 2>/dev/null || true
+    fi
+    
+    # Fix VS Code Server binary permissions
+    if command -v code-server >/dev/null 2>&1; then
+        local code_server_path=$(which code-server)
+        chmod +x "$code_server_path"
+        chown root:root "$code_server_path" 2>/dev/null || true
+        
+        # Remove broken symlinks around code-server
+        local code_server_dir=$(dirname "$code_server_path")
+        find "$code_server_dir" -type l -exec test ! -e {} \; -delete 2>/dev/null || true
+    fi
+    
+    # Fix NVM configuration for vscode user
+    if id vscode >/dev/null 2>&1; then
+        local vscode_home="/home/vscode"
+        if [[ -s "$vscode_home/.nvm/nvm.sh" ]]; then
+            chown -R vscode:vscode "$vscode_home/.nvm" 2>/dev/null || true
+            chmod -R 755 "$vscode_home/.nvm" 2>/dev/null || true
+            
+            # Clear NVM prefix issues
+            sudo -u vscode bash -c "
+                export NVM_DIR='$vscode_home/.nvm'
+                [ -s \"\$NVM_DIR/nvm.sh\" ] && \. \"\$NVM_DIR/nvm.sh\"
+                nvm use --delete-prefix --lts --silent 2>/dev/null || true
+                nvm alias default lts/* 2>/dev/null || true
+            " 2>/dev/null || true
+        fi
+    fi
+    
+    success "Node.js module resolution issues fixed"
+}
+
 # Configure VS Code Server
 configure_vscode() {
     info "💻 Configuring VS Code Server..."
+    
+    # Fix Node.js module resolution first
+    fix_node_module_resolution
     
     check_vscode_server
     
@@ -114,7 +178,12 @@ EOF
     
     success "VS Code Server configured"
     info "Password: $password"
-    info "Access: http://localhost:8080"
+    
+    # Get server IP for remote access
+    local server_ip
+    server_ip=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "localhost")
+    info "Access: http://$server_ip:8080"
+    info "Local access: http://localhost:8080"
 }
 
 # Show VS Code Server status
@@ -132,7 +201,10 @@ show_status() {
         fi
         
         # Show access URL
-        info "Access: http://localhost:8080"
+        local server_ip
+        server_ip=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "localhost")
+        info "Access: http://$server_ip:8080"
+        info "Local access: http://localhost:8080"
         info "Remote access: https://code.remote.domain.tld (when tunnel is configured)"
     else
         info "VS Code Server: Stopped"
@@ -142,6 +214,9 @@ show_status() {
 # Start VS Code Server
 start_vscode() {
     info "🚀 Starting VS Code Server..."
+    
+    # Fix Node.js module resolution first
+    fix_node_module_resolution
     
     check_vscode_server
     
