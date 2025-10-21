@@ -1104,27 +1104,104 @@ main() {
     
     success "🎉 YADS installation completed!"
     
-    # Final permission verification and fix
-    info "🔍 Running final permission verification..."
+    # Comprehensive permission and configuration fixes
+    info "🔍 Running comprehensive permission and configuration fixes..."
     
-    # Ensure /usr/local permissions are correct
+    # Fix /usr/local permissions
+    info "🔧 Fixing /usr/local permissions..."
     chown -R root:root /usr/local
     chmod -R 755 /usr/local
+    success "/usr/local permissions fixed"
     
-    # Ensure VS Code Server permissions are correct
+    # Fix VS Code Server permissions
+    info "💻 Fixing VS Code Server permissions..."
     if id vscode >/dev/null 2>&1; then
         chown -R vscode:vscode /home/vscode
         chmod -R 755 /home/vscode
         chmod 600 /home/vscode/.config/code-server/config.yaml 2>/dev/null || true
+        
+        # Fix Node.js/NVM permissions for vscode user
+        if [[ -d "/home/vscode/.nvm" ]]; then
+            chown -R vscode:vscode /home/vscode/.nvm
+            chmod -R 755 /home/vscode/.nvm
+        fi
+        success "VS Code Server permissions fixed"
+    fi
+    
+    # Fix NVM and .npmrc configuration conflicts
+    info "🔄 Fixing NVM and .npmrc configuration conflicts..."
+    
+    # Get the development user
+    local dev_user=""
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        dev_user="$SUDO_USER"
+    else
+        dev_user="$(whoami)"
+    fi
+    
+    # Fix .npmrc conflicts for the development user
+    local user_home="/home/$dev_user"
+    local npmrc_file="$user_home/.npmrc"
+    
+    if [[ -f "$npmrc_file" ]]; then
+        # Backup original .npmrc
+        cp "$npmrc_file" "$npmrc_file.backup.$(date +%Y%m%d_%H%M%S)" 2>/dev/null || true
+        
+        # Remove conflicting settings
+        sed -i '/^globalconfig/d' "$npmrc_file" 2>/dev/null || true
+        sed -i '/^prefix/d' "$npmrc_file" 2>/dev/null || true
+        
+        # Clean up empty lines
+        sed -i '/^$/N;/^\n$/d' "$npmrc_file" 2>/dev/null || true
+        
+        success "Fixed .npmrc configuration conflicts"
+    fi
+    
+    # Fix NVM prefix issues
+    if [[ -s "$user_home/.nvm/nvm.sh" ]]; then
+        # Source NVM and clear prefix issues
+        export NVM_DIR="$user_home/.nvm"
+        source "$NVM_DIR/nvm.sh" 2>/dev/null || true
+        
+        # Clear prefix for current version
+        local current_version=$(nvm current 2>/dev/null || echo "none")
+        if [[ "$current_version" != "none" && "$current_version" != "system" ]]; then
+            nvm use --delete-prefix "$current_version" --silent 2>/dev/null || true
+        fi
+        
+        success "Fixed NVM prefix issues"
+    fi
+    
+    # Clean up npm global configuration
+    if command -v npm >/dev/null 2>&1; then
+        npm cache clean --force 2>/dev/null || true
+        npm config delete prefix 2>/dev/null || true
+        npm config delete globalconfig 2>/dev/null || true
+        success "Cleaned up npm global configuration"
     fi
     
     # Ensure YADS script has proper permissions
     if [[ -f "/usr/local/bin/yads" ]]; then
         chown root:root /usr/local/bin/yads
         chmod 755 /usr/local/bin/yads
+        success "YADS script permissions fixed"
     fi
     
-    success "Final permission verification completed"
+    # Fix line endings for all scripts
+    info "📝 Fixing line endings for all scripts..."
+    find /opt/yads -name "*.sh" -o -name "yads" | while read -r file; do
+        if [[ -f "$file" ]]; then
+            if command -v dos2unix >/dev/null 2>&1; then
+                dos2unix "$file" 2>/dev/null || true
+            else
+                sed -i 's/\r$//' "$file" 2>/dev/null || true
+            fi
+            chmod +x "$file"
+        fi
+    done
+    success "Line endings fixed for all scripts"
+    
+    success "Comprehensive permission and configuration fixes completed"
     
     # Verify and fix PATH configuration
     verify_and_fix_path
