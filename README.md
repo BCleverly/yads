@@ -1,45 +1,50 @@
 # YADS - Yet Another Development Server
 
-🚀 **A complete remote PHP web development server** with secure internet access via Cloudflared tunnels.
+🐳 **A modern, containerized remote development environment** with automatic SSL, subdomain routing, and Cloudflare tunnel integration.
 
 ## ✨ What is YADS?
 
-YADS transforms any Linux server into a powerful remote development environment with:
+YADS transforms any server into a powerful, containerized development environment with:
 
-- 🌐 **Secure Internet Access** - No port forwarding needed
+- 🐳 **Docker-based Architecture** - Everything runs in containers
+- 🌐 **Automatic SSL** - Traefik handles SSL certificates via Cloudflare
+- 🔗 **Subdomain Routing** - Each service gets its own subdomain
+- ☁️ **Cloudflare Tunnels** - Secure internet access without port forwarding
 - 💻 **VS Code Server** - Full IDE in your browser
-- 🐘 **Multiple PHP Versions** - PHP 5.6 to 8.5 (default: 8.4)
-- 🗄️ **Modern Databases** - MySQL, PostgreSQL, Redis
-- 🚀 **AI-Powered CLI** - Cursor CLI for intelligent assistance
-- 📁 **Project Management** - Easy Laravel, Symfony, WordPress setup
-- 🔧 **Multiple Web Servers** - Apache, Nginx, or FrankenPHP
+- 🗄️ **Multiple Databases** - MySQL, PostgreSQL, Redis
+- 🛠️ **Development Tools** - phpMyAdmin, pgAdmin, Portainer
+- 📁 **Project Management** - Easy project creation and management
 
 ## 🚀 Quick Start
 
-### 📦 Installation (Choose One)
+### Prerequisites
+- Docker and Docker Compose installed
+- Cloudflare account (for tunnels and SSL)
+- Domain name (optional, can use localhost)
 
-#### Option 1: One-Liner Installation (Recommended)
+### 📦 Installation
+
+#### Option 1: One-Liner Setup (Recommended)
 ```bash
-git clone https://github.com/BCleverly/yads.git && cd yads && chmod +x *.sh && sudo ./install.sh
+git clone https://github.com/BCleverly/yads.git && cd yads && chmod +x setup-docker.sh && ./setup-docker.sh
 ```
 
-#### Option 2: Step-by-Step Installation
+#### Option 2: Step-by-Step Setup
 ```bash
 # 1. Clone the repository
 git clone https://github.com/BCleverly/yads.git
 cd yads
 
-# 2. Make scripts executable
-chmod +x *.sh
+# 2. Setup Docker environment
+chmod +x setup-docker.sh
+./setup-docker.sh
 
-# 3. Install YADS
-sudo ./install.sh
-```
+# 3. Configure environment
+# Edit .env file with your settings
+nano .env
 
-#### Option 3: Development Setup
-```bash
-# For local development (makes yads available locally)
-git clone https://github.com/BCleverly/yads.git && cd yads && chmod +x local-setup.sh && ./local-setup.sh
+# 4. Start services
+./yads start
 ```
 
 ### 🔧 First-Time Setup
@@ -47,312 +52,372 @@ git clone https://github.com/BCleverly/yads.git && cd yads && chmod +x local-set
 After installation, configure your development environment:
 
 ```bash
-# 1. Check installation status
+# 1. Check service status
 yads status
 
-# 2. Configure VS Code Server
-yads vscode setup
-
-# 3. Set up Cloudflared tunnel (for internet access)
-yads tunnel setup
-
-# 4. Create your first project
+# 2. Create your first project
 yads project myapp laravel
+
+# 3. Create database for your project
+yads db create myapp mysql
+
+# 4. Setup project dependencies (optional)
+yads setup myapp
 ```
 
 ## 📋 Commands Reference
 
 ### 🎯 Core Commands
 ```bash
-yads status          # Show service status
 yads start           # Start all services
 yads stop            # Stop all services
 yads restart         # Restart all services
+yads status          # Show service status
+yads logs [service]  # Show logs for service
+yads update          # Update containers
 yads help            # Show help
 yads version         # Show version
 ```
 
-### 🐘 PHP Management
-```bash
-yads php 8.4         # Install PHP 8.4 (default)
-yads php 8.2         # Install PHP 8.2
-yads php 7.4         # Install PHP 7.4
-yads php list        # List available versions
-```
-
-### 🌐 Web Servers
-```bash
-yads server apache     # Switch to Apache
-yads server nginx      # Switch to Nginx  
-yads server frankenphp # Switch to FrankenPHP
-yads server status     # Show current server
-```
-
-### 🗄️ Databases
-```bash
-yads database mysql      # Install MySQL
-yads database postgresql # Install PostgreSQL
-yads database redis      # Install Redis
-```
-
-### 🔗 Cloudflared Tunnels
-```bash
-yads tunnel setup    # Configure tunnel (first time)
-yads tunnel start    # Start tunnel
-yads tunnel stop     # Stop tunnel
-yads tunnel status   # Show tunnel status
-```
-
-### 💻 VS Code Server
-```bash
-yads vscode setup    # Configure VS Code Server
-yads vscode start    # Start VS Code Server
-yads vscode stop     # Stop VS Code Server
-yads vscode password # Change password
-```
-
 ### 📁 Project Management
 ```bash
-yads project myapp              # Create basic PHP project
-yads project myapp laravel       # Create Laravel project
-yads project myapp symfony       # Create Symfony project
-yads project myapp wordpress     # Create WordPress project
-yads project list               # List all projects
+yads project myapp laravel    # Create Laravel project
+yads project myapp symfony    # Create Symfony project
+yads project myapp wordpress   # Create WordPress project
+yads project myapp node        # Create Node.js project
+yads setup myapp              # Setup project dependencies
+yads stop-project myapp       # Stop project
+yads list-projects            # List all projects
+```
+
+### 🗄️ Database Management
+```bash
+yads db create mydb mysql     # Create MySQL database
+yads db create mydb postgres  # Create PostgreSQL database
+yads db list                  # List all databases
+```
+
+### 🐳 Container Management
+```bash
+yads restart traefik         # Restart specific service
+yads backup                  # Backup all data
 ```
 
 ## 🏗️ Architecture
 
-### 📁 Directory Structure
-```
-/opt/yads/                 # YADS installation
-├── modules/               # YADS modules
-├── config/                # Configuration files
-└── logs/                  # Log files
+### Core Services
+- **Traefik** - Reverse proxy and load balancer with automatic SSL
+- **Cloudflared** - Secure tunnel to Cloudflare network
+- **VS Code Server** - Browser-based IDE
+- **MySQL** - Database server with phpMyAdmin
+- **PostgreSQL** - Database server with pgAdmin
+- **Redis** - Caching and session storage
+- **Nginx** - Web server with PHP-FPM
+- **Portainer** - Docker management interface
 
-/var/www/projects/         # Your projects
-├── myapp/                 # Laravel project
-├── blog/                  # WordPress project
-└── api/                   # Symfony project
-
-/opt/vscode-server/        # VS Code Server
-├── .config/               # VS Code configuration
-└── .password              # Generated password
-```
-
-### 🌐 Service Architecture
-- **VS Code Server**: `localhost:8080` (authenticated)
-- **Web Server**: `localhost:80` (Apache/Nginx/FrankenPHP)
-- **Cloudflared**: Secure tunnel to internet
-- **Databases**: MySQL, PostgreSQL, Redis
-
-### 🔗 Domain Routing
-- `code.yourdomain.com` → VS Code Server
-- `myapp.yourdomain.com` → `/var/www/projects/myapp`
-- `blog.yourdomain.com` → `/var/www/projects/blog`
+### Service URLs
+After starting YADS, access your services at:
+- **Traefik Dashboard**: `https://traefik.yourdomain.com`
+- **VS Code Server**: `https://code.yourdomain.com`
+- **phpMyAdmin**: `https://phpmyadmin.yourdomain.com`
+- **pgAdmin**: `https://pgadmin.yourdomain.com`
+- **Portainer**: `https://portainer.yourdomain.com`
+- **Your Projects**: `https://project-name.yourdomain.com`
 
 ## ⚙️ Configuration
 
-### 💻 VS Code Server Setup
-1. **Access**: `http://localhost:8080` or `https://code.yourdomain.com`
-2. **Password**: Generated during installation (stored in `/opt/vscode-server/.password`)
-3. **Change Password**: `yads vscode password`
+### Environment Variables
 
-### 🔗 Cloudflared Tunnel Setup
-1. **Configure**: `yads tunnel setup`
-2. **Login**: Browser opens to Cloudflare dashboard
-3. **DNS**: Configure your domain DNS records
-4. **Access**: `https://code.yourdomain.com`
+Create a `.env` file with your configuration:
 
-### 📁 Project Access
-- **Local**: `http://localhost/myapp`
-- **Internet**: `https://myapp.yourdomain.com`
-
-## 🚀 Complete Setup Example
-
-### **Step 1: Install YADS**
 ```bash
-# Install YADS
-sudo ./install.sh
+# Domain Configuration
+DOMAIN=yourdomain.com
+ACME_EMAIL=admin@yourdomain.com
+
+# Cloudflare Configuration
+CLOUDFLARE_API_TOKEN=your_cloudflare_api_token
+CLOUDFLARE_TUNNEL_TOKEN=your_cloudflare_tunnel_token
+
+# VS Code Server
+VSCODE_PASSWORD=your_secure_password
+VSCODE_SUDO_PASSWORD=your_sudo_password
+
+# Database Configuration
+MYSQL_ROOT_PASSWORD=your_mysql_root_password
+MYSQL_PASSWORD=your_mysql_password
+POSTGRES_PASSWORD=your_postgres_password
+REDIS_PASSWORD=your_redis_password
 ```
 
-### **Step 2: Configure Tunnel**
-```bash
-# Configure tunnel
-yads tunnel setup yourdomain.com
+### Cloudflare Setup
+
+1. **Get API Token:**
+   - Go to Cloudflare Dashboard → My Profile → API Tokens
+   - Create token with Zone:Edit permissions
+
+2. **Create Tunnel:**
+   - Go to Cloudflare Dashboard → Zero Trust → Tunnels
+   - Create new tunnel
+   - Copy the tunnel token
+
+3. **Configure DNS:**
+   - Add CNAME records for your subdomains
+   - Point to your tunnel domain
+
+## 🐳 Adding Custom Containers
+
+### Method 1: Edit docker-compose.custom.yml
+
+```yaml
+version: '3.8'
+
+services:
+  my-custom-app:
+    image: nginx:alpine
+    container_name: yads-my-custom-app
+    restart: unless-stopped
+    volumes:
+      - ./projects/my-custom-app:/usr/share/nginx/html
+    networks:
+      - yads-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.my-custom-app.rule=Host(`my-custom-app.${DOMAIN:-localhost}`)"
+      - "traefik.http.routers.my-custom-app.entrypoints=websecure"
+      - "traefik.http.routers.my-custom-app.tls.certresolver=cloudflare"
+      - "traefik.http.services.my-custom-app.loadbalancer.server.port=80"
 ```
 
-### **Step 3: Create Projects**
+### Method 2: Create separate docker-compose file
+
+```bash
+# Create your own docker-compose file
+cat > docker-compose.my-app.yml << 'EOF'
+version: '3.8'
+
+services:
+  my-app:
+    build: ./projects/my-app
+    container_name: yads-my-app
+    restart: unless-stopped
+    networks:
+      - yads-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.my-app.rule=Host(`my-app.${DOMAIN:-localhost}`)"
+      - "traefik.http.routers.my-app.entrypoints=websecure"
+      - "traefik.http.routers.my-app.tls.certresolver=cloudflare"
+      - "traefik.http.services.my-app.loadbalancer.server.port=3000"
+EOF
+
+# Start with your custom services
+docker-compose -f docker-compose.yml -f docker-compose.my-app.yml up -d
+```
+
+## 🔧 Development Workflow
+
+### 1. Create a New Project
 ```bash
 # Create Laravel project
 yads project myapp laravel
-# Results in: https://myapp.yourdomain.com
 
-# Create WordPress project
-yads project blog wordpress
-# Results in: https://blog.yourdomain.com
+# Access at: https://myapp.yourdomain.com
 ```
 
-### **Step 4: Access Your Services**
-- **VS Code Server**: `https://code.yourdomain.com`
-- **Your Projects**: `https://myapp.yourdomain.com`
-
-## 📋 Prerequisites
-
-- ✅ **Linux**: Ubuntu/Debian/CentOS/RHEL/Fedora/Arch
-- ✅ **Permissions**: Root or sudo access
-- ✅ **Internet**: Stable connection required
-- ✅ **Cloudflare**: Account for tunnel setup
-
-## 🔄 Updating YADS
-
-### 🚀 Automatic Update (Recommended)
+### 2. Develop with VS Code Server
 ```bash
-cd ~/yads
-./update-yads.sh
+# Access VS Code Server
+# URL: https://code.yourdomain.com
+# Password: (from .env file)
 ```
 
-**What it does:**
-- ✅ Pulls latest changes from GitHub
-- ✅ Fixes line endings automatically  
-- ✅ Makes all scripts executable
-- ✅ Updates CLI symlink
-- ✅ Updates shell configuration
-
-### 🔧 Manual Update
+### 3. Database Management
 ```bash
-git pull origin master
-./fix-line-endings.sh
-./setup.sh
-./local-setup.sh
+# MySQL: https://phpmyadmin.yourdomain.com
+# PostgreSQL: https://pgadmin.yourdomain.com
 ```
 
-## 🗑️ Uninstallation
-
-### Normal Uninstall
+### 4. Docker Management
 ```bash
-yads uninstall
+# Portainer: https://portainer.yourdomain.com
+# Or use: docker-compose ps
 ```
 
-### Manual Uninstall
-```bash
-sudo ./manual-uninstall.sh
+## 📁 Directory Structure
+
+```
+yads/
+├── docker-compose.yml          # Core services
+├── docker-compose.custom.yml  # Custom services
+├── yads                       # Main CLI script
+├── setup-docker.sh             # Setup script
+├── .env                        # Environment configuration
+├── data/                       # Persistent data
+│   ├── traefik/               # Traefik data
+│   ├── mysql/                 # MySQL data
+│   ├── postgres/              # PostgreSQL data
+│   ├── redis/                 # Redis data
+│   ├── vscode/                # VS Code Server data
+│   └── portainer/             # Portainer data
+├── projects/                   # Your projects
+│   └── sample/                 # Sample project
+├── config/                     # Configuration files
+│   ├── traefik/               # Traefik config
+│   ├── nginx/                  # Nginx config
+│   └── php/                    # PHP config
+├── scripts/                    # Management scripts
+│   ├── database-manager.sh     # Database operations
+│   ├── container-orchestrator.sh # Container orchestration
+│   └── project-manager.sh      # Project management
+└── templates/                  # Project templates
+    ├── php/                    # PHP template
+    ├── laravel/                # Laravel template
+    └── node/                   # Node.js template
 ```
 
-> **Note**: SSH keys and user data are preserved during uninstallation.
+## 🔒 Security Features
 
-## 🔧 Troubleshooting
+### SSL/TLS
+- Automatic SSL certificates via Cloudflare
+- HTTPS redirect for all services
+- Modern TLS configuration
 
-### ❌ "sudo: yads: command not found" Error
-**Problem**: `sudo` doesn't have access to your user's PATH.
+### Authentication
+- VS Code Server password protection
+- Basic auth for admin interfaces
+- Secure database passwords
 
-**Solutions:**
+### Network Security
+- Docker network isolation
+- Cloudflare tunnel encryption
+- Rate limiting and security headers
+
+## 🚨 Troubleshooting
+
+### Common Issues
+
+#### Services not starting
 ```bash
-# Solution 1: Use direct script (recommended)
-sudo ./install.sh
+# Check logs
+yads logs
 
-# Solution 2: Use full path
-sudo ~/.local/bin/yads install
-
-# Solution 3: Preserve PATH
-sudo -E yads install
+# Check specific service
+yads logs traefik
 ```
 
-### 🚫 Services Not Starting
+#### SSL certificate issues
 ```bash
-# Check status
+# Check Traefik logs
+yads logs traefik
+
+# Verify Cloudflare configuration
+# Check .env file for correct tokens
+```
+
+#### Database connection issues
+```bash
+# Check database logs
+yads logs mysql
+yads logs postgres
+
+# Verify database is running
 yads status
-
-# Restart all services
-yads restart
-
-# Check specific logs
-journalctl -u vscode-server
-journalctl -u cloudflared
 ```
 
-### 💻 VS Code Server Issues
+### Debug Commands
 ```bash
-# Change password
-yads vscode password
+# Check all containers
+docker-compose ps
 
-# Restart VS Code Server
-yads vscode restart
+# Check logs for specific service
+docker-compose logs -f traefik
 
-# Check configuration
-cat /opt/vscode-server/.config/code-server/config.yaml
+# Restart specific service
+docker-compose restart traefik
+
+# Rebuild and restart
+docker-compose up -d --build
 ```
 
-### 🔗 Tunnel Issues
+## 🔄 Updates
+
+### Update YADS
 ```bash
-# Check tunnel status
-yads tunnel status
+# Update all services
+yads update
 
-# Restart tunnel
-yads tunnel restart
-
-# Check tunnel logs
-journalctl -u cloudflared
+# Or manually
+docker-compose pull
+docker-compose up -d
 ```
 
-### 🐛 Common Issues
-
-#### "cannot execute: required file not found"
+### Update specific service
 ```bash
-# Fix line endings
-./fix-line-endings.sh
+# Update Traefik
+docker-compose pull traefik
+docker-compose up -d traefik
 ```
 
-#### Commands not available after installation
+## 📚 Examples
+
+### Laravel Project
 ```bash
-# Update shell configuration
-source ~/.bashrc
-# or restart your terminal
+# Create Laravel project
+yads project myapp laravel
+
+# Access at: https://myapp.yourdomain.com
+# Database: MySQL (via phpMyAdmin)
+# IDE: VS Code Server
 ```
 
-## 🛠️ Development
+### Node.js Project
+```bash
+# Create Node.js project
+yads project myapp node
 
-### 📁 Project Structure
-```
-yads/                    # Main CLI script
-install.sh              # Installation script
-modules/                # Individual modules
-├── install.sh          # Installation module
-├── tunnel.sh           # Cloudflared module
-├── vscode.sh           # VS Code Server module
-└── ...
+# Access at: https://myapp.yourdomain.com
+# Database: PostgreSQL (via pgAdmin)
+# IDE: VS Code Server
 ```
 
-### ➕ Adding New Modules
-1. Create new module in `modules/`
-2. Add command handling in main `yads` script
-3. Update help documentation
+### WordPress Site
+```bash
+# Create WordPress project
+yads project myapp wordpress
 
-## 📄 License
-
-MIT License - see LICENSE file for details.
+# Access at: https://myapp.yourdomain.com
+# Database: MySQL (via phpMyAdmin)
+# IDE: VS Code Server
+```
 
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Submit a pull request
+4. Test with Docker setup
+5. Submit a pull request
+
+## 📄 License
+
+MIT License - see LICENSE file for details.
 
 ## 🆘 Support
 
 - **Issues**: [GitHub Issues](https://github.com/BCleverly/yads/issues)
 - **Documentation**: [Wiki](https://github.com/BCleverly/yads/wiki)
+- **Docker**: [Docker Hub](https://hub.docker.com/)
 
-## 📝 Changelog
+## 🎉 Features
 
-### v1.0.0
-- ✅ Initial release
-- ✅ VS Code Server with authentication
-- ✅ Cloudflared tunnel support
-- ✅ Multiple PHP version support (5.6-8.5)
-- ✅ Web server choice (Apache/Nginx/FrankenPHP)
-- ✅ Database support (MySQL/PostgreSQL/Redis)
-- ✅ Project management
-- ✅ Wildcard domain routing
-- ✅ NVM and Node.js LTS support
-- ✅ Cursor CLI integration
+- ✅ **Docker-based** - Everything in containers
+- ✅ **Automatic SSL** - Traefik + Cloudflare
+- ✅ **Subdomain routing** - Each service gets its own domain
+- ✅ **VS Code Server** - Full IDE in browser
+- ✅ **Multiple databases** - MySQL, PostgreSQL, Redis
+- ✅ **Development tools** - phpMyAdmin, pgAdmin, Portainer
+- ✅ **Project management** - Easy project creation
+- ✅ **Custom containers** - Add your own services
+- ✅ **Cloudflare tunnels** - Secure internet access
+- ✅ **Modern stack** - Latest versions of all tools

@@ -1,0 +1,64 @@
+# Traefik Configuration for YADS
+# This file provides additional configuration for Traefik
+
+# Global configuration
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+# API and dashboard configuration
+api:
+  dashboard: true
+  insecure: true
+  debug: true
+
+# Entry points
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entrypoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    address: ":443"
+
+# Providers
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: yads-network
+  file:
+    filename: /etc/traefik/dynamic.yml
+    watch: true
+
+# Certificate resolvers
+certificatesResolvers:
+  cloudflare:
+    acme:
+      tlsChallenge: {}
+      email: admin@example.com
+      storage: /acme.json
+      dnsChallenge:
+        provider: cloudflare
+        delayBeforeCheck: 60s
+        resolvers:
+          - "1.1.1.1:53"
+          - "1.0.0.1:53"
+
+# Logging
+log:
+  level: INFO
+  filePath: /var/log/traefik.log
+
+accessLog:
+  filePath: /var/log/access.log
+
+# Metrics
+metrics:
+  prometheus:
+    addEntryPointsLabels: true
+    addServicesLabels: true

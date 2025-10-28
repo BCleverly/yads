@@ -1,66 +1,92 @@
-# YADS Makefile
-# Development and testing utilities
+# YADS Docker Makefile
+# Docker-based development environment management
 
-.PHONY: help install test clean lint format
+.PHONY: help setup start stop restart status logs clean build pull update
 
 # Default target
 help:
-	@echo "YADS - Yet Another Development Server"
-	@echo "====================================="
+	@echo "YADS Docker - Container Management"
+	@echo "=================================="
 	@echo ""
 	@echo "Available targets:"
-	@echo "  install     - Install YADS locally"
-	@echo "  test        - Run all tests"
-	@echo "  test-unit   - Run unit tests"
-	@echo "  test-integration - Run integration tests"
-	@echo "  clean       - Clean up test artifacts"
+	@echo "  setup       - Setup YADS Docker environment"
+	@echo "  start       - Start all YADS services"
+	@echo "  stop        - Stop all YADS services"
+	@echo "  restart     - Restart all YADS services"
+	@echo "  status      - Show service status"
+	@echo "  logs        - Show logs for all services"
+	@echo "  clean       - Clean up containers and volumes"
+	@echo "  build       - Build all containers"
+	@echo "  pull        - Pull latest images"
+	@echo "  update      - Update and restart services"
 	@echo "  lint        - Run shellcheck on scripts"
-	@echo "  format      - Format shell scripts"
 	@echo "  help        - Show this help message"
 	@echo ""
 
-# Install YADS locally
-install:
-	@echo "Installing YADS locally..."
-	chmod +x yads install.sh manual-uninstall.sh
-	chmod +x modules/*.sh
-	@echo "✅ YADS installed locally"
+# Setup YADS Docker environment
+setup:
+	@echo "Setting up YADS Docker environment..."
+	@chmod +x setup-docker.sh
+	@./setup-docker.sh
+	@echo "✅ YADS Docker setup completed"
 
-# Run all tests
-test: test-unit test-integration
-	@echo "✅ All tests completed"
+# Start all services
+start:
+	@echo "Starting YADS services..."
+	@./yads start
+	@echo "✅ YADS services started"
 
-# Run unit tests
-test-unit:
-	@echo "Running unit tests..."
-	@if command -v bats >/dev/null 2>&1; then \
-		bats tests/unit/; \
-	else \
-		echo "⚠️  Bats not installed, skipping unit tests"; \
-	fi
+# Stop all services
+stop:
+	@echo "Stopping YADS services..."
+	@./yads stop
+	@echo "✅ YADS services stopped"
 
-# Run integration tests
-test-integration:
-	@echo "Running integration tests..."
-	@if command -v bats >/dev/null 2>&1; then \
-		bats tests/integration/; \
-	else \
-		echo "⚠️  Bats not installed, skipping integration tests"; \
-	fi
+# Restart all services
+restart:
+	@echo "Restarting YADS services..."
+	@./yads restart
+	@echo "✅ YADS services restarted"
 
-# Clean up test artifacts
+# Show service status
+status:
+	@./yads status
+
+# Show logs for all services
+logs:
+	@./yads logs
+
+# Clean up containers and volumes
 clean:
-	@echo "Cleaning up test artifacts..."
-	rm -rf /tmp/yads-test-*
-	rm -rf /tmp/yads-backup-*
+	@echo "Cleaning up YADS Docker environment..."
+	@docker-compose down -v
+	@docker system prune -f
 	@echo "✅ Cleanup completed"
+
+# Build all containers
+build:
+	@echo "Building YADS containers..."
+	@docker-compose build
+	@echo "✅ Containers built"
+
+# Pull latest images
+pull:
+	@echo "Pulling latest images..."
+	@docker-compose pull
+	@echo "✅ Images pulled"
+
+# Update and restart services
+update:
+	@echo "Updating YADS services..."
+	@./yads update
+	@echo "✅ Services updated"
 
 # Run shellcheck on scripts
 lint:
 	@echo "Running shellcheck..."
 	@if command -v shellcheck >/dev/null 2>&1; then \
-		shellcheck yads install.sh manual-uninstall.sh; \
-		shellcheck modules/*.sh; \
+		shellcheck yads setup-docker.sh; \
+		shellcheck scripts/*.sh; \
 		echo "✅ Shellcheck completed"; \
 	else \
 		echo "⚠️  Shellcheck not installed, skipping linting"; \
@@ -70,8 +96,8 @@ lint:
 format:
 	@echo "Formatting shell scripts..."
 	@if command -v shfmt >/dev/null 2>&1; then \
-		shfmt -w -i 4 -ci yads install.sh manual-uninstall.sh; \
-		shfmt -w -i 4 -ci modules/*.sh; \
+		shfmt -w -i 4 -ci yads setup-docker.sh; \
+		shfmt -w -i 4 -ci scripts/*.sh; \
 		echo "✅ Formatting completed"; \
 	else \
 		echo "⚠️  shfmt not installed, skipping formatting"; \
@@ -81,38 +107,20 @@ format:
 dev-deps:
 	@echo "Installing development dependencies..."
 	@if command -v apt-get >/dev/null 2>&1; then \
-		sudo apt-get update && sudo apt-get install -y bats shellcheck shfmt; \
+		sudo apt-get update && sudo apt-get install -y shellcheck shfmt; \
 	elif command -v dnf >/dev/null 2>&1; then \
-		sudo dnf install -y bats ShellCheck shfmt; \
+		sudo dnf install -y ShellCheck shfmt; \
 	elif command -v yum >/dev/null 2>&1; then \
-		sudo yum install -y bats ShellCheck; \
+		sudo yum install -y ShellCheck; \
 	elif command -v pacman >/dev/null 2>&1; then \
-		sudo pacman -S --noconfirm bats shellcheck shfmt; \
+		sudo pacman -S --noconfirm shellcheck shfmt; \
 	else \
 		echo "⚠️  Package manager not supported for dev dependencies"; \
 	fi
 
-# Create test environment
-test-env:
-	@echo "Creating test environment..."
-	@mkdir -p tests/unit tests/integration
-	@echo "✅ Test environment created"
-
-# Run specific test file
-test-file:
-	@if [ -z "$(FILE)" ]; then \
-		echo "Usage: make test-file FILE=tests/unit/test.bats"; \
-		exit 1; \
-	fi
-	@if command -v bats >/dev/null 2>&1; then \
-		bats "$(FILE)"; \
-	else \
-		echo "⚠️  Bats not installed"; \
-	fi
-
 # Show version
 version:
-	@echo "YADS version: $$(cat version)"
+	@echo "YADS Docker version: $$(cat version)"
 
 # Show system info
 info:
@@ -122,3 +130,5 @@ info:
 	@echo "Shell: $$(basename $$SHELL)"
 	@echo "User: $$(whoami)"
 	@echo "Home: $$HOME"
+	@echo "Docker: $$(docker --version)"
+	@echo "Docker Compose: $$(docker-compose --version)"
